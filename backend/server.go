@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
-	"social-network/backend/pkg/db/sqlite"
+	"social-network/pkg/db/sqlite"
 )
 
 func main() {
