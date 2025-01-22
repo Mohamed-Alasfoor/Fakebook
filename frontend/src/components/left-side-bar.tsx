@@ -1,12 +1,12 @@
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Home, Users, Settings, MessageCircle, Bell, LogOut, X } from "lucide-react"
-import Link from "next/link"
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Home, Users, Settings, MessageCircle, Bell, LogOut, X } from "lucide-react";
+import Link from "next/link";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 interface LeftSidebarProps {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
@@ -16,34 +16,39 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
     { icon: MessageCircle, label: "Chats", href: "/chats" },
     { icon: Bell, label: "Notifications", href: "/notifications" },
     { icon: Settings, label: "Settings", href: "/settings" },
-  ]
+  ];
 
   return (
     <div
-      className={`
-      fixed inset-y-0 left-0 z-50 w-64 bg-[#6C5CE7] text-white p-4 flex flex-col
+    className={`
+      fixed top-0 left-0 z-50 w-64 h-screen bg-[#6C5CE7] text-white p-4 flex flex-col
       transform transition-transform duration-300 ease-in-out
       ${isOpen ? "translate-x-0" : "-translate-x-full"}
-      md:relative md:translate-x-0
+      md:translate-x-0
     `}
-    >
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center">
-            <span className="text-[#6C5CE7] font-bold">F</span>
-          </div>
-          <span className="font-semibold text-lg">Fakebook</span>
+  >
+    {/* Header */}
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center">
+          <span className="text-[#6C5CE7] font-bold">F</span>
         </div>
-        <Button variant="ghost" size="icon" className="md:hidden text-white" onClick={onClose}>
-          <X className="h-6 w-6" />
-        </Button>
+        <span className="font-semibold text-lg">Fakebook</span>
       </div>
-
-      <div className="relative mb-6">
-        <Input placeholder="Search" className="bg-white/20 border-0 placeholder:text-white/70 text-white" />
-      </div>
-
-      <nav className="flex-1">
+      <Button variant="ghost" size="icon" className="md:hidden text-white" onClick={onClose}>
+        <X className="h-6 w-6" />
+      </Button>
+    </div>
+  
+    {/* Search */}
+    <div className="mb-4">
+      <Input placeholder="Search" className="bg-white/20 border-0 placeholder:text-white/70 text-white" />
+    </div>
+  
+    {/* Main Content: Navigation + Profile */}
+    <div className="flex-1 flex flex-col justify-between">
+      {/* Navigation */}
+      <nav>
         <ul className="space-y-2">
           {menuItems.map((item) => (
             <li key={item.label}>
@@ -58,8 +63,9 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
           ))}
         </ul>
       </nav>
-
-      <div className="mt-auto pt-4 border-t border-white/10">
+  
+      {/* Profile Section */}
+      <div className="pt-4 border-t border-white/10">
         <div className="flex items-center gap-3 px-3 py-2">
           <Avatar>
             <AvatarImage src="/profile.png" alt="Img" />
@@ -76,6 +82,11 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
         </div>
       </div>
     </div>
-  )
-}
+  </div>
+  
 
+  
+  
+
+  );
+}

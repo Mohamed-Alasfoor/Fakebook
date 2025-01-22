@@ -8,10 +8,14 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Sidebar */}
       <LeftSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <MainContent onOpenSidebar={() => setSidebarOpen(true)} />
+
+      {/* Main Content */}
+      <div className="flex-1 md:ml-64">
+        <MainContent onOpenSidebar={() => setSidebarOpen(true)} />
+      </div>
     </div>
   )
 }
-
