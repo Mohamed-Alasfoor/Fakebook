@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"social-network/pkg/db/sqlite"
+	"social-network/pkg/auth"
 )
 
 func main() {
@@ -14,10 +15,10 @@ func main() {
 	// Apply migrations
 	sqlite.ApplyMigrations(db)
 
-	// Placeholder for server setup
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Social Network Backend is running!"))
-	})
+
+	// Register authentication routes
+	http.HandleFunc("/register", auth.RegisterHandler(db))
+	http.HandleFunc("/login", auth.LoginHandler(db))
 
 	log.Println("Server is running on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
