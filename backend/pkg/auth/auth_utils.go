@@ -37,7 +37,7 @@ func ValidateEmail(email string) error {
 // ValidatePassword validates the password using regex
 func ValidatePassword(password string) error {
 	if len(password) < 8 || !regexp.MustCompile(`[A-Z]`).MatchString(password) || !regexp.MustCompile(`[a-z]`).MatchString(password) || !regexp.MustCompile(`[0-9]`).MatchString(password) || !regexp.MustCompile(`[!@#~$%^&*(),.?":{}|<>]`).MatchString(password) {
-		return errors.New("Password must be at least 8 characters long, contain an uppercase letter, a lowercase letter, a number, and a special character")
+		return errors.New("password must be at least 8 characters long, contain an uppercase letter, a lowercase letter, a number, and a special character")
 	}
 	return nil
 }
