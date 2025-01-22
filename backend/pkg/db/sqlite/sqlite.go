@@ -29,7 +29,7 @@ func ApplyMigrations(db *sql.DB) {
 
 	// Point to the migration files directory
 	m, err := migrate.NewWithDatabaseInstance(
-    "file://pkg/db/migrations", // Adjust path to current working directory
+    "file://pkg/db/migrations", 
     "sqlite3",
     driver,
 )
