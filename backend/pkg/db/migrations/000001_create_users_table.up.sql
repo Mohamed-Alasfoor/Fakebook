@@ -7,6 +7,6 @@ CREATE TABLE users (
     nickname TEXT UNIQUE,
     about_me TEXT,
     avatar TEXT,
-    date_of_birth TEXT NOT NULL
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    date_of_birth TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP 
 );
