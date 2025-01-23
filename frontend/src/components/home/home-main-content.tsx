@@ -25,7 +25,7 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
       content:
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed euismod, nunc vel tincidunt lacinia, nisl nisl aliquam nunc, vitae aliquam nisl nisl sit amet nisl.",
       userProfileImage: "/profile.png",
-      postImage: "https://gratisography.com/wp-content/uploads/2024/11/gratisography-augmented-reality-800x525.jpg",
+      postImage: "https://images2.boardingschoolreview.com/photo/593/IMG-Academy-6r5kz9j4u144kso44sw8800k0-1122.jpg",
       likes: 22,
       comments: 3,
     },

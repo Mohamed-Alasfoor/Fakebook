@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { MainContent } from "@/components/home-main-content"
-import { LeftSidebar } from "@/components/left-side-bar"
+import { MainContent } from "@/components/home/home-main-content"
+import { LeftSidebar } from "@/components/home/left-side-bar"
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
