@@ -8,7 +8,7 @@ import (
 	"social-network/pkg/likes"
 	"social-network/pkg/posts"
 	"social-network/pkg/comments"
-	"social-network/pkg/middleware" // Import for CORS middleware
+	"social-network/pkg/middleware" 
 )
 
 func main() {
@@ -33,6 +33,7 @@ func main() {
 	mux.HandleFunc("/posts/unlike", likes.RemoveLikeHandler(db))
 	mux.HandleFunc("/posts/comments", comments.AddCommentHandler(db))
 	mux.HandleFunc("/posts/comments/delete", comments.DeleteCommentHandler(db))
+	mux.HandleFunc("/posts/comments/all", comments.GetCommentsByPostHandler(db))
 
 	// Protected Routes (require authentication)
 	mux.Handle("/protected-resource", auth.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
