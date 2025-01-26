@@ -11,6 +11,7 @@ import (
 	"social-network/pkg/middleware"
 	"social-network/pkg/notifications"
 	"social-network/pkg/posts"
+	"social-network/pkg/users"
 )
 
 func main() {
@@ -38,11 +39,15 @@ func main() {
 	mux.HandleFunc("/posts/comments/all", comments.GetCommentsByPostHandler(db))
 	mux.HandleFunc("/posts/privacy", posts.UpdatePostPrivacyHandler(db)) // Added handler for updating post privacy
 	mux.HandleFunc("/notifications", notifications.AddNotificationHandler(db))
-  mux.HandleFunc("/notifications/get", notifications.GetNotificationsHandler(db))
-  mux.HandleFunc("/notifications/read", notifications.MarkNotificationReadHandler(db))
-  mux.HandleFunc("/follow", followers.FollowHandler(db))
-mux.HandleFunc("/unfollow", followers.UnfollowHandler(db))
-mux.HandleFunc("/followers", followers.GetFollowersHandler(db))
+  	mux.HandleFunc("/notifications/get", notifications.GetNotificationsHandler(db))
+  	mux.HandleFunc("/notifications/read", notifications.MarkNotificationReadHandler(db))
+  	mux.HandleFunc("/follow", followers.FollowHandler(db))
+	mux.HandleFunc("/unfollow", followers.UnfollowHandler(db))
+	mux.HandleFunc("/followers", followers.GetFollowersHandler(db))
+	mux.HandleFunc("/follow/request", followers.HandleFollowRequest(db))
+	mux.HandleFunc("/follow/requests", followers.GetFollowRequestsHandler(db))
+	mux.HandleFunc("/users/privacy", users.UpdatePrivacyHandler(db))
+
 
 
 
