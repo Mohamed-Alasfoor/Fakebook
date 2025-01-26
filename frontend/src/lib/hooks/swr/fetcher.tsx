@@ -1,6 +1,4 @@
 export const fetcher = (url: string) =>
-    fetch(url, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
-      },
-    }).then((res) => res.json());
+  fetch(url, {
+    credentials: 'include', 
+  }).then((res) => res.json());
