@@ -35,9 +35,10 @@ func main() {
 	mux.HandleFunc("/posts/comments", comments.AddCommentHandler(db))
 	mux.HandleFunc("/posts/comments/delete", comments.DeleteCommentHandler(db))
 	mux.HandleFunc("/posts/comments/all", comments.GetCommentsByPostHandler(db))
+	mux.HandleFunc("/posts/privacy", posts.UpdatePostPrivacyHandler(db)) // Added handler for updating post privacy
 	mux.HandleFunc("/notifications", notifications.AddNotificationHandler(db))
-mux.HandleFunc("/notifications/get", notifications.GetNotificationsHandler(db))
-mux.HandleFunc("/notifications/read", notifications.MarkNotificationReadHandler(db))
+  mux.HandleFunc("/notifications/get", notifications.GetNotificationsHandler(db))
+  mux.HandleFunc("/notifications/read", notifications.MarkNotificationReadHandler(db))
 
 
 	// Protected Routes (require authentication)
