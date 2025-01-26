@@ -7,11 +7,15 @@ import (
 
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID, err := sessions.GetSessionValue(r, "userID")
-		if err != nil || userID == nil {
+		sessionID, err := sessions.GetSessionValue(r, sessions.SessionCookieName)
+		if err != nil || sessionID == "" {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
+
+		// Optionally log or use the session ID here if needed
+		r = r.WithContext(r.Context())
+
 		next.ServeHTTP(w, r)
 	})
 }

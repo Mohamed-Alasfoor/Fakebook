@@ -61,52 +61,58 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
 
 // LoginHandler handles user login
 func LoginHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != http.MethodPost {
-            http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
 
-        if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
-            log.Println("Error decoding JSON:", err)
-            http.Error(w, "Invalid request body", http.StatusBadRequest)
-            return
-        }
+		var creds struct {
+			Identifier string `json:"identifier"`
+			Password   string `json:"password"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+			log.Println("Error decoding JSON:", err)
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
 
-        var hashedPassword string
-        var userID string // Update to string for UUID
+		var hashedPassword, userID string
+		query := `SELECT id, password FROM users WHERE email = ? OR nickname = ?`
+		err := db.QueryRow(query, creds.Identifier, creds.Identifier).Scan(&userID, &hashedPassword)
+		if err == sql.ErrNoRows {
+			log.Println("Invalid credentials: no matching user found")
+			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			return
+		} else if err != nil {
+			log.Println("Database error:", err)
+			http.Error(w, "Failed to retrieve user", http.StatusInternalServerError)
+			return
+		}
 
-        query := `
-            SELECT id, password FROM users 
-            WHERE email = ? OR nickname = ?
-        `
-        err := db.QueryRow(query, creds.Identifier, creds.Identifier).Scan(&userID, &hashedPassword)
-        if err == sql.ErrNoRows {
-            log.Println("Invalid credentials: no matching user found")
-            http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-            return
-        } else if err != nil {
-            log.Println("Database error:", err)
-            http.Error(w, "Failed to retrieve user", http.StatusInternalServerError)
-            return
-        }
+		if err := CheckPassword(hashedPassword, creds.Password); err != nil {
+			log.Println("Password mismatch:", err)
+			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			return
+		}
 
-        if err := CheckPassword(hashedPassword, creds.Password); err != nil {
-            log.Println("Password mismatch:", err)
-            http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-            return
-        }
+		// Generate a session ID
+		sessionID := uuid.New().String()
 
-        // Create session
-        if err := sessions.SetSessionValue(w, r, "userID", userID); err != nil {
-            log.Println("Failed to create session:", err)
-            http.Error(w, "Failed to create session", http.StatusInternalServerError)
-            return
-        }
+		// Set session ID in the cookie
+		if err := sessions.SetSessionValue(w, r, sessions.SessionCookieName, sessionID); err != nil {
+			log.Println("Failed to create session:", err)
+			http.Error(w, "Failed to create session", http.StatusInternalServerError)
+			return
+		}
 
-        log.Println("User logged in successfully:", userID)
-        w.Write([]byte("Login successful"))
-    }
+		log.Println("User logged in successfully:", userID)
+
+		// Return session ID as response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"session_id": "` + sessionID + `"}`))
+	}
 }
 
 
