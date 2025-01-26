@@ -4,12 +4,13 @@ import (
 	"log"
 	"net/http"
 	"social-network/pkg/auth"
-	"social-network/pkg/db/sqlite"
-	"social-network/pkg/likes"
-	"social-network/pkg/posts"
 	"social-network/pkg/comments"
-	"social-network/pkg/middleware" 
+	"social-network/pkg/db/sqlite"
+	"social-network/pkg/followers"
+	"social-network/pkg/likes"
+	"social-network/pkg/middleware"
 	"social-network/pkg/notifications"
+	"social-network/pkg/posts"
 )
 
 func main() {
@@ -39,6 +40,10 @@ func main() {
 	mux.HandleFunc("/notifications", notifications.AddNotificationHandler(db))
   mux.HandleFunc("/notifications/get", notifications.GetNotificationsHandler(db))
   mux.HandleFunc("/notifications/read", notifications.MarkNotificationReadHandler(db))
+  mux.HandleFunc("/follow", followers.FollowHandler(db))
+mux.HandleFunc("/unfollow", followers.UnfollowHandler(db))
+mux.HandleFunc("/followers", followers.GetFollowersHandler(db))
+
 
 
 	// Protected Routes (require authentication)
