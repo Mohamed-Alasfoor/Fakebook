@@ -9,15 +9,16 @@ import { LoginButtons } from "@/components/auth/login-buttons"
 import { PasswordInput } from "@/components/auth/password"
 import { useState } from "react"
 import axios from "axios"
+import { useRouter } from "next/navigation"
 export default function LoginPage() {
-
+    const router = useRouter();
     const [identifier,setIdentifier] = useState("");
     const [password,setPassword] = useState("");
     const handleLogin = async (e:any) => {
         e.preventDefault();
         try{
           const res = await axios.post('http://localhost:8080/login', { identifier, password });
-          alert(res.data.message);
+          router.push('/');
         }catch(err){
             alert(err);
         }
