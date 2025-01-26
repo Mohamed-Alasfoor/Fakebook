@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"social-network/pkg/notifications"
+	"github.com/google/uuid"
 )
 
 type Comment struct {
@@ -29,13 +30,15 @@ func AddCommentHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
+			// Generate a unique ID for the comment
+			commentID := uuid.New().String()
 
 		// Insert the comment into the database
 		query := `
 			INSERT INTO comments (id, post_id, user_id, content, image_url)
 			VALUES (?, ?, ?, ?, ?)
 		`
-		_, err := db.Exec(query, comment.ID, comment.PostID, comment.UserID, comment.Content, comment.ImageURL)
+		_, err := db.Exec(query, commentID, comment.PostID, comment.UserID, comment.Content, comment.ImageURL)
 		if err != nil {
 			http.Error(w, "Failed to add comment", http.StatusInternalServerError)
 			return

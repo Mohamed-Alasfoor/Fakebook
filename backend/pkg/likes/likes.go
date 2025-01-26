@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
    "social-network/pkg/notifications"
+	 "github.com/google/uuid"
 )
 type Like struct {
 	ID     string `json:"id"`
@@ -27,12 +28,15 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Generate a unique ID for the like
+		likeID := uuid.New().String()
+
 		// Insert the like into the database
 		query := `
 			INSERT INTO likes (id, post_id, user_id)
 			VALUES (?, ?, ?)
 		`
-		_, err := db.Exec(query, "some-uuid", postID, userID)
+		_, err := db.Exec(query, likeID, postID, userID)
 		if err != nil {
 			http.Error(w, "Failed to add like", http.StatusInternalServerError)
 			return
