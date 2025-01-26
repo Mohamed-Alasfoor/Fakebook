@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"social-network/pkg/notifications"
 )
 
 type Comment struct {
@@ -37,6 +38,21 @@ func AddCommentHandler(db *sql.DB) http.HandlerFunc {
 		_, err := db.Exec(query, comment.ID, comment.PostID, comment.UserID, comment.Content, comment.ImageURL)
 		if err != nil {
 			http.Error(w, "Failed to add comment", http.StatusInternalServerError)
+			return
+		}
+
+		// Fetch the owner of the post
+		var postOwnerID string
+		err = db.QueryRow(`SELECT user_id FROM posts WHERE id = ?`, comment.PostID).Scan(&postOwnerID)
+		if err != nil {
+			http.Error(w, "Failed to retrieve post owner", http.StatusInternalServerError)
+			return
+		}
+
+		// Use utility function to add a notification
+		err = notifications.CreateNotification(db, postOwnerID, "comment", "Your post was commented on", comment.PostID, comment.UserID, "", "")
+		if err != nil {
+			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
 			return
 		}
 

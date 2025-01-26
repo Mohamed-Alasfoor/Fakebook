@@ -3,8 +3,8 @@ package likes
 import (
 	"database/sql"
 	"net/http"
+   "social-network/pkg/notifications"
 )
-
 type Like struct {
 	ID     string `json:"id"`
 	PostID string `json:"post_id"`
@@ -35,6 +35,21 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 		_, err := db.Exec(query, "some-uuid", postID, userID)
 		if err != nil {
 			http.Error(w, "Failed to add like", http.StatusInternalServerError)
+			return
+		}
+
+		// Fetch the owner of the post
+		var postOwnerID string
+		err = db.QueryRow(`SELECT user_id FROM posts WHERE id = ?`, postID).Scan(&postOwnerID)
+		if err != nil {
+			http.Error(w, "Failed to retrieve post owner", http.StatusInternalServerError)
+			return
+		}
+
+		// Use utility function to add a notification
+		err = notifications.CreateNotification(db, postOwnerID, "like", "Your post was liked", postID, userID, "", "")
+		if err != nil {
+			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
 			return
 		}
 
