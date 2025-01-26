@@ -39,3 +39,19 @@ func DestroySession(w http.ResponseWriter, r *http.Request) error {
 	})
 	return nil
 }
+
+// GetUserIDFromSession retrieves the user_id from the session cookie
+func GetUserIDFromSession(r *http.Request) (string, error) {
+	// Get the session value (user_id) from the cookie
+	userID, err := GetSessionValue(r, SessionCookieName)
+	if err != nil {
+		return "", err
+	}
+
+	// If user_id is empty, return an error
+	if userID == "" {
+		return "", errors.New("user_id not found in session")
+	}
+
+	return userID, nil
+}

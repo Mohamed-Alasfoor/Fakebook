@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"social-network/pkg/sessions"
 
 	"github.com/google/uuid"
 )
@@ -77,10 +78,10 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Get the user_id of the requester
-		requesterID := r.URL.Query().Get("user_id")
-		if requesterID == "" {
-			http.Error(w, "Missing user_id parameter", http.StatusBadRequest)
+		// Retrieve the user_id from the session
+		requesterID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
 
