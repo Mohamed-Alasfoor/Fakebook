@@ -29,6 +29,7 @@ interface Post {
   privacy: string;
   selectedUsers?: string[];
   nickname?: string;
+  has_liked: boolean;
 }
 
 interface MainContentProps {
@@ -131,14 +132,14 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
             <div className="flex items-center gap-6 text-sm text-gray-500">
               <button
                 className={`flex items-center gap-2 ${
-                  likesState[post.id] ? "text-red-500" : "text-gray-500"
+                  likesState[post.id] || post.has_liked && "text-red-500" 
                 }`}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleLike(post.id);
                 }}
               >
-                <Heart className="w-5 h-5" /> {post.likes_count} Likes
+                <Heart className={`w-5 h-5 ${post.has_liked&&'text-red-500'}`}  /> {post.likes_count} Likes
               </button>
               <button className="flex items-center gap-2">
                 <MessageCircle className="w-5 h-5" /> {post.comments_count} Comments
@@ -179,7 +180,7 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
           )}
           <div className="flex items-center gap-6 text-sm text-gray-500">
             <button className="flex items-center gap-2">
-              <Heart className="w-5 h-5" /> {selectedPost.likes_count} Likes
+              <Heart className={`w-5 h-5 ${selectedPost.has_liked&&'text-red-500'}`} /> {selectedPost.likes_count} Likes
             </button>
             <button className="flex items-center gap-2">
               <MessageCircle className="w-5 h-5" /> {selectedPost.comments_count} Comments
