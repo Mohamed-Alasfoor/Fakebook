@@ -10,12 +10,16 @@ const SessionCookieName = "social-network-session"
 // SetSessionValue sets a session cookie with the given key-value pair
 func SetSessionValue(w http.ResponseWriter, r *http.Request, key, value string) error {
 	http.SetCookie(w, &http.Cookie{
-		Name:  key,
-		Value: value,
-		Path:  "/",
+		Name:     key,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,                      // Prevent access to cookies via JavaScript
+		Secure:   true,                      // Ensure cookies are sent over HTTPS only
+		SameSite: http.SameSiteStrictMode,   // Enforce SameSite: Strict
 	})
 	return nil
 }
+
 
 // GetSessionValue retrieves the session cookie value for the given key
 func GetSessionValue(r *http.Request, key string) (string, error) {
