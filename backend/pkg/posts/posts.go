@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"social-network/pkg/sessions"
-
 	"github.com/google/uuid"
+	"strings"
+	"path/filepath"
+	"io"
+	"os"
+
 )
 
 type Post struct {
@@ -34,15 +38,21 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		var post Post
-		if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
-			http.Error(w, "Invalid request body. Ensure the JSON is correctly formatted.", http.StatusBadRequest)
+		// Parse multipart form with a max upload size of 10 MB
+		const maxUploadSize = 10 << 20 // 10 MB
+		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+			http.Error(w, "File is too large. Max size is 10 MB.", http.StatusBadRequest)
 			return
 		}
 
+		// Retrieve the text fields
+		content := r.FormValue("content")
+		privacy := r.FormValue("privacy")
+		userID := r.FormValue("user_id")
+
 		// Validate that user_id exists in the users table
 		var userExists bool
-		err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)`, post.UserID).Scan(&userExists)
+		err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)`, userID).Scan(&userExists)
 		if err != nil {
 			http.Error(w, "Failed to validate user", http.StatusInternalServerError)
 			return
@@ -52,29 +62,65 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Generate a UUID for the post
-		post.ID = uuid.New().String()
-
-		// Default privacy is 'public'
-		if post.Privacy == "" {
-			post.Privacy = "public"
+		// Validate privacy (optional)
+		if privacy == "" {
+			privacy = "public" // Default privacy
+		} else if privacy != "public" && privacy != "almost_private" && privacy != "private" {
+			http.Error(w, "Invalid privacy setting", http.StatusBadRequest)
+			return
 		}
+
+		// Handle the file upload
+		file, fileHeader, err := r.FormFile("file") // "file" is the field name in the form
+		if err != nil {
+			http.Error(w, "File upload failed. Ensure you included an image.", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// Validate the file type
+		allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif"}
+		fileExt := strings.ToLower(filepath.Ext(fileHeader.Filename))
+		if !contains(allowedExtensions, fileExt) {
+			http.Error(w, "Invalid file type. Only .jpg, .jpeg, .png, and .gif are allowed.", http.StatusBadRequest)
+			return
+		}
+
+		// Generate a unique file name and save the file
+		fileName := uuid.New().String() + fileExt
+		filePath := filepath.Join("uploads", fileName) // Make sure the "uploads" directory exists
+		outFile, err := os.Create(filePath)
+		if err != nil {
+			http.Error(w, "Failed to save file", http.StatusInternalServerError)
+			return
+		}
+		defer outFile.Close()
+
+		// Copy the uploaded file to the server
+		if _, err := io.Copy(outFile, file); err != nil {
+			http.Error(w, "Failed to save file", http.StatusInternalServerError)
+			return
+		}
+
+		// Generate a UUID for the post
+		postID := uuid.New().String()
 
 		// Insert the post into the database
 		query := `
 			INSERT INTO posts (id, user_id, content, image_url, privacy)
 			VALUES (?, ?, ?, ?, ?)
 		`
-		_, err = db.Exec(query, post.ID, post.UserID, post.Content, post.ImageURL, post.Privacy)
+		_, err = db.Exec(query, postID, userID, content, "/"+filePath, privacy) // Save the relative path
 		if err != nil {
 			http.Error(w, "Failed to create post", http.StatusInternalServerError)
 			return
 		}
 
 		// Handle private posts: add allowed users to post_privacy
-		if post.Privacy == "private" && len(post.AllowedUsers) > 0 {
-			for _, userID := range post.AllowedUsers {
-				_, err := db.Exec(`INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)`, post.ID, userID)
+		if privacy == "private" {
+			allowedUsers := r.Form["allowed_users"] // Retrieve as a slice of user IDs
+			for _, allowedUserID := range allowedUsers {
+				_, err := db.Exec(`INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)`, postID, allowedUserID)
 				if err != nil {
 					http.Error(w, "Failed to set private post permissions", http.StatusInternalServerError)
 					return
@@ -85,6 +131,16 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte("Post created successfully"))
 	}
+}
+
+// Helper function to check if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 

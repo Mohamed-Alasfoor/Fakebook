@@ -60,6 +60,9 @@ func main() {
 	// User Privacy
 	mux.HandleFunc("/users/privacy", users.UpdatePrivacyHandler(db))
 
+	// Serve uploaded files
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("backend/uploads"))))
+
 	// Protected Routes (require authentication)
 	mux.Handle("/protected-resource", auth.AuthMiddleware(db, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("This is a protected resource"))
