@@ -3,9 +3,12 @@ package likes
 import (
 	"database/sql"
 	"net/http"
-   "social-network/pkg/notifications"
-	 "github.com/google/uuid"
+	"social-network/pkg/notifications"
+	"social-network/pkg/sessions"
+
+	"github.com/google/uuid"
 )
+
 type Like struct {
 	ID     string `json:"id"`
 	PostID string `json:"post_id"`
@@ -20,11 +23,30 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Extract post_id and user_id from query params
+		// Retrieve the user_id from the session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		// Extract post_id from query params
 		postID := r.URL.Query().Get("post_id")
-		userID := r.URL.Query().Get("user_id")
-		if postID == "" || userID == "" {
-			http.Error(w, "Missing post_id or user_id", http.StatusBadRequest)
+		if postID == "" {
+			http.Error(w, "Missing post_id", http.StatusBadRequest)
+			return
+		}
+
+		// Check if the user has already liked the post
+		var exists bool
+		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM likes WHERE post_id = ? AND user_id = ?)`, postID, userID).Scan(&exists)
+		if err != nil {
+			http.Error(w, "Failed to check like status", http.StatusInternalServerError)
+			return
+		}
+
+		if exists {
+			http.Error(w, "Post already liked", http.StatusBadRequest)
 			return
 		}
 
@@ -36,7 +58,7 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 			INSERT INTO likes (id, post_id, user_id)
 			VALUES (?, ?, ?)
 		`
-		_, err := db.Exec(query, likeID, postID, userID)
+		_, err = db.Exec(query, likeID, postID, userID)
 		if err != nil {
 			http.Error(w, "Failed to add like", http.StatusInternalServerError)
 			return
@@ -62,6 +84,7 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+
 // RemoveLikeHandler allows a user to unlike a post
 func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -70,11 +93,30 @@ func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Extract post_id and user_id from query params
+		// Retrieve the user_id from the session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		// Extract post_id from query params
 		postID := r.URL.Query().Get("post_id")
-		userID := r.URL.Query().Get("user_id")
-		if postID == "" || userID == "" {
-			http.Error(w, "Missing post_id or user_id", http.StatusBadRequest)
+		if postID == "" {
+			http.Error(w, "Missing post_id", http.StatusBadRequest)
+			return
+		}
+
+		// Check if the user has already liked the post
+		var exists bool
+		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM likes WHERE post_id = ? AND user_id = ?)`, postID, userID).Scan(&exists)
+		if err != nil {
+			http.Error(w, "Failed to check like status", http.StatusInternalServerError)
+			return
+		}
+
+		if !exists {
+			http.Error(w, "Cannot unlike a post you haven't liked", http.StatusBadRequest)
 			return
 		}
 
@@ -83,7 +125,7 @@ func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 			DELETE FROM likes
 			WHERE post_id = ? AND user_id = ?
 		`
-		_, err := db.Exec(query, postID, userID)
+		_, err = db.Exec(query, postID, userID)
 		if err != nil {
 			http.Error(w, "Failed to remove like", http.StatusInternalServerError)
 			return
@@ -92,3 +134,4 @@ func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Post unliked successfully"))
 	}
 }
+
