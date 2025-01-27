@@ -6,9 +6,9 @@ export function usePosts() {
   const { data, error, isLoading, mutate } = useSWR('http://localhost:8080/posts/all', fetcher);
 
   return {
-    posts: data,
+    posts: data || [],
     isLoading,
     isError: !!error,
-    refreshPosts: mutate,
+    refreshPosts: mutate, // To manually refresh the data
   };
 }

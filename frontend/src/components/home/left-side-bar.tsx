@@ -3,13 +3,21 @@ import { Input } from "@/components/ui/input";
 import { Home, Users, Settings, MessageCircle, Bell, LogOut, X } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-
+import {handleLogout} from "@/lib/functions/logout";
+import { useRouter } from "next/navigation";
 interface LeftSidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
 export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
+  const router = useRouter();
+
+  const handleLogoutClick =  () => {
+    handleLogout(router);
+  };
+
+
   const menuItems = [
     { icon: Home, label: "Home", href: "/" },
     { icon: Users, label: "Groups", href: "/groups" },
@@ -75,7 +83,7 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
             <h3 className="text-sm font-medium truncate">UserName</h3>
             <p className="text-xs text-white/70">Profile</p>
           </div>
-          <Button variant="ghost" size="icon" className="text-white/70 hover:text-white">
+          <Button variant="ghost" size="icon" className="text-white/70 hover:text-white" onClick={handleLogoutClick}>
             <LogOut className="h-4 w-4" />
             <span className="sr-only">Sign out</span>
           </Button>
