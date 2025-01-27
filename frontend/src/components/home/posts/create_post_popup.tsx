@@ -26,14 +26,11 @@ export function CreatePostPopup({ isOpen, onClose, onCreatePost }: CreatePostPop
   }
 
   const handleSubmit = () => {
-    const newPost = {
-      content,
-      image: image ? URL.createObjectURL(image) : null,
-      privacy,
-      selectedUsers: privacy === "private" ? selectedUsers : [],
+    try{
+      
+    }catch(error){
+        alert(error)
     }
-    onCreatePost(newPost)
-    onClose()
   }
 
   // Mock user list for demonstration

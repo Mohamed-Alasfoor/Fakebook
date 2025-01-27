@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, MessageCircle, Send, Heart, ArrowLeft, Share2, Menu } from "lucide-react";
 import { CreatePostPopup } from "@/components/home/posts/create_post_popup";
 import { usePosts } from "@/lib/hooks/swr/getPosts";
+import axios from "axios";
 
 interface Comment {
   id: number;
@@ -27,6 +28,7 @@ interface Post {
   created_at: string;
   privacy: string;
   selectedUsers?: string[];
+  nickname?: string;
 }
 
 interface MainContentProps {
@@ -40,6 +42,40 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
 
   const { posts, isLoading, isError } = usePosts();
 
+  // Track like status for each post
+  const [likesState, setLikesState] = useState<{ [key: number]: boolean }>({});
+
+  // Handle like/unlike action
+  const handleLike = async (postId: number) => {
+    try {
+      const isLiked = likesState[postId] ?? false;
+  
+      if (isLiked) {
+        // Unlike 
+        await axios.delete(`http://localhost:8080/posts/unlike`, {
+          params: { post_id: postId },
+        });
+        setLikesState((prev) => ({ ...prev, [postId]: false }));
+        // Decrease like count
+        const postIndex = posts.findIndex((post: { id: number; }) => post.id === postId);
+        if (postIndex >= 0) posts[postIndex].likes_count--;
+      } else {
+        // Like 
+        await axios.post(`http://localhost:8080/posts/like`, null, {
+          params: { post_id: postId },
+        });
+        setLikesState((prev) => ({ ...prev, [postId]: true }));
+        // Increase like count
+        const postIndex = posts.findIndex((post: { id: number; }) => post.id === postId);
+        if (postIndex >= 0) posts[postIndex].likes_count++;
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
+    }
+  };
+  
+  
+
   const PostsList = () => {
     if (isLoading) {
       return <div>Loading posts...</div>;
@@ -51,7 +87,7 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
 
     return (
       <>
-        <div className="flex items-center gap-4 mb-8" >
+        <div className="flex items-center gap-4 mb-8">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={onOpenSidebar}>
             <Menu className="h-6 w-6" />
           </Button>
@@ -77,7 +113,7 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
                 <AvatarFallback></AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="font-semibold">{post.user_id}</h3>
+                <h3 className="font-semibold">{post.nickname}</h3>
                 <p className="text-sm text-gray-500">{post.created_at}</p>
               </div>
             </div>
@@ -93,7 +129,15 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
             )}
 
             <div className="flex items-center gap-6 text-sm text-gray-500">
-              <button className="flex items-center gap-2">
+              <button
+                className={`flex items-center gap-2 ${
+                  likesState[post.id] ? "text-red-500" : "text-gray-500"
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLike(post.id);
+                }}
+              >
                 <Heart className="w-5 h-5" /> {post.likes_count} Likes
               </button>
               <button className="flex items-center gap-2">
@@ -106,9 +150,9 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
     );
   };
 
+  
   const PostView = () => {
     if (!selectedPost) return null;
-
     return (
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
