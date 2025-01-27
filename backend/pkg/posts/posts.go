@@ -15,13 +15,15 @@ type Post struct {
 	Content       string   `json:"content"`
 	ImageURL      string   `json:"image_url,omitempty"`
 	Privacy       string   `json:"privacy"`
-	AllowedUsers  []string `json:"allowed_users,omitempty"` // For private posts
+	AllowedUsers  []string `json:"allowed_users,omitempty"`
 	LikesCount    int      `json:"likes_count"`
 	CommentsCount int      `json:"comments_count"`
 	CreatedAt     string   `json:"created_at"`
-	Nickname      string   `json:"nickname"` // New field for user nickname
-	Avatar        string   `json:"avatar"`   // New field for user avatar/profile image
+	Nickname      string   `json:"nickname"`
+	Avatar        string   `json:"avatar"`
+	HasLiked      bool     `json:"has_liked"` // New field
 }
+
 
 
 // CreatePostHandler allows a user to create a post
@@ -88,7 +90,8 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 
 
 
-// GetPostsHandler fetches all posts based on privacy
+
+// GetPostsHandler fetches all posts based on privacy and includes if the user has liked each post
 func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -115,7 +118,8 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 				posts.comments_count, 
 				posts.created_at, 
 				users.nickname, 
-				users.avatar
+				users.avatar,
+				EXISTS(SELECT 1 FROM likes WHERE likes.post_id = posts.id AND likes.user_id = ?) AS has_liked
 			FROM posts
 			INNER JOIN users ON posts.user_id = users.id
 			WHERE
@@ -125,7 +129,7 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 			ORDER BY posts.created_at DESC;
 		`
 
-		rows, err := db.Query(query, requesterID, requesterID)
+		rows, err := db.Query(query, requesterID, requesterID, requesterID)
 		if err != nil {
 			http.Error(w, "Failed to fetch posts", http.StatusInternalServerError)
 			return
@@ -136,11 +140,12 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var post Post
 			var nickname, avatar string
+			var hasLiked bool // To store whether the user liked the post
 
 			if err := rows.Scan(
 				&post.ID, &post.UserID, &post.Content, &post.ImageURL,
 				&post.Privacy, &post.LikesCount, &post.CommentsCount,
-				&post.CreatedAt, &nickname, &avatar,
+				&post.CreatedAt, &nickname, &avatar, &hasLiked,
 			); err != nil {
 				http.Error(w, "Failed to parse posts", http.StatusInternalServerError)
 				return
@@ -148,6 +153,10 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 
 			post.Nickname = nickname
 			post.Avatar = avatar
+
+			// Add the 'has_liked' attribute to the post JSON response
+			post.HasLiked = hasLiked
+
 			posts = append(posts, post)
 		}
 
@@ -155,6 +164,7 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(posts)
 	}
 }
+
 
 
 
