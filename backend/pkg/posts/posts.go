@@ -19,7 +19,10 @@ type Post struct {
 	LikesCount    int      `json:"likes_count"`
 	CommentsCount int      `json:"comments_count"`
 	CreatedAt     string   `json:"created_at"`
+	Nickname      string   `json:"nickname"` // New field for user nickname
+	Avatar        string   `json:"avatar"`   // New field for user avatar/profile image
 }
+
 
 // CreatePostHandler allows a user to create a post
 func CreatePostHandler(db *sql.DB) http.HandlerFunc {
@@ -31,7 +34,19 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 
 		var post Post
 		if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			http.Error(w, "Invalid request body. Ensure the JSON is correctly formatted.", http.StatusBadRequest)
+			return
+		}
+
+		// Validate that user_id exists in the users table
+		var userExists bool
+		err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)`, post.UserID).Scan(&userExists)
+		if err != nil {
+			http.Error(w, "Failed to validate user", http.StatusInternalServerError)
+			return
+		}
+		if !userExists {
+			http.Error(w, "Invalid user_id. User does not exist.", http.StatusBadRequest)
 			return
 		}
 
@@ -48,7 +63,7 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 			INSERT INTO posts (id, user_id, content, image_url, privacy)
 			VALUES (?, ?, ?, ?, ?)
 		`
-		_, err := db.Exec(query, post.ID, post.UserID, post.Content, post.ImageURL, post.Privacy)
+		_, err = db.Exec(query, post.ID, post.UserID, post.Content, post.ImageURL, post.Privacy)
 		if err != nil {
 			http.Error(w, "Failed to create post", http.StatusInternalServerError)
 			return
@@ -70,6 +85,9 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+
+
+
 // GetPostsHandler fetches all posts based on privacy
 func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -85,15 +103,26 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Fetch posts based on privacy level
+		// SQL query to fetch posts with valid user references
 		query := `
-			SELECT id, user_id, content, image_url, privacy, likes_count, comments_count, created_at
+			SELECT 
+				posts.id, 
+				posts.user_id, 
+				posts.content, 
+				posts.image_url, 
+				posts.privacy, 
+				posts.likes_count, 
+				posts.comments_count, 
+				posts.created_at, 
+				users.nickname, 
+				users.avatar
 			FROM posts
+			INNER JOIN users ON posts.user_id = users.id
 			WHERE
-				privacy = 'public'
-				OR (privacy = 'almost_private' AND user_id IN (SELECT followed_id FROM followers WHERE follower_id = ?))
-				OR (privacy = 'private' AND id IN (SELECT post_id FROM post_privacy WHERE user_id = ?))
-			ORDER BY created_at DESC
+				posts.privacy = 'public'
+				OR (posts.privacy = 'almost_private' AND posts.user_id IN (SELECT followed_id FROM followers WHERE follower_id = ?))
+				OR (posts.privacy = 'private' AND posts.id IN (SELECT post_id FROM post_privacy WHERE user_id = ?))
+			ORDER BY posts.created_at DESC;
 		`
 
 		rows, err := db.Query(query, requesterID, requesterID)
@@ -106,18 +135,30 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 		var posts []Post
 		for rows.Next() {
 			var post Post
-			if err := rows.Scan(&post.ID, &post.UserID, &post.Content, &post.ImageURL, &post.Privacy, &post.LikesCount, &post.CommentsCount, &post.CreatedAt); err != nil {
+			var nickname, avatar string
+
+			if err := rows.Scan(
+				&post.ID, &post.UserID, &post.Content, &post.ImageURL,
+				&post.Privacy, &post.LikesCount, &post.CommentsCount,
+				&post.CreatedAt, &nickname, &avatar,
+			); err != nil {
 				http.Error(w, "Failed to parse posts", http.StatusInternalServerError)
 				return
 			}
+
+			post.Nickname = nickname
+			post.Avatar = avatar
 			posts = append(posts, post)
 		}
 
-		// Return the posts as JSON
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(posts)
 	}
 }
+
+
+
+
 
 // UpdatePostPrivacyHandler updates the privacy of a post
 func UpdatePostPrivacyHandler(db *sql.DB) http.HandlerFunc {
