@@ -9,12 +9,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type Like struct {
-	ID     string `json:"id"`
-	PostID string `json:"post_id"`
-	UserID string `json:"user_id"`
-}
-
 // AddLikeHandler allows a user to like a post
 func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -23,12 +17,15 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Retrieve the user_id from the session
-		userID, err := sessions.GetUserIDFromSession(r)
+		// Retrieve the session_id from the session cookie
+		_, err := sessions.GetSessionValue(r, sessions.SessionCookieName)
 		if err != nil {
 			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
+
+		// Query the database to retrieve the user_id associated with the session_id
+		userID, err := sessions.GetUserIDFromSession(r) 
 
 		// Extract post_id from query params
 		postID := r.URL.Query().Get("post_id")
@@ -84,7 +81,6 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
 // RemoveLikeHandler allows a user to unlike a post
 func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -93,12 +89,15 @@ func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Retrieve the user_id from the session
-		userID, err := sessions.GetUserIDFromSession(r)
+		// Retrieve the session_id from the session cookie
+		_, err := sessions.GetSessionValue(r, sessions.SessionCookieName)
 		if err != nil {
 			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
+
+		// Query the database to retrieve the user_id associated with the session_id
+		userID, err := sessions.GetUserIDFromSession(r) 
 
 		// Extract post_id from query params
 		postID := r.URL.Query().Get("post_id")
@@ -134,4 +133,3 @@ func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Post unliked successfully"))
 	}
 }
-
