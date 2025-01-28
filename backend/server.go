@@ -11,8 +11,8 @@ import (
 	"social-network/pkg/middleware"
 	"social-network/pkg/notifications"
 	"social-network/pkg/posts"
-	"social-network/pkg/users"
 	"social-network/pkg/sessions"
+	"social-network/pkg/users"
 )
 
 func main() {
@@ -64,13 +64,15 @@ func main() {
 	// User Privacy
 	mux.HandleFunc("/users/privacy", users.UpdatePrivacyHandler(db))
 
-	// Serve uploaded files
-	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("backend/uploads"))))
 
 	// Protected Routes (require authentication)
 	mux.Handle("/protected-resource", auth.AuthMiddleware(db, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("This is a protected resource"))
 	})))
+
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
+
+
 
 	// Apply CORS middleware globally
 	log.Println("Server is running on http://localhost:8080")
