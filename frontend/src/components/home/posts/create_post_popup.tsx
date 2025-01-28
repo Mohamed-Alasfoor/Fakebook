@@ -25,13 +25,52 @@ export function CreatePostPopup({ isOpen, onClose, onCreatePost }: CreatePostPop
     }
   }
 
-  const handleSubmit = () => {
-    try{
-      
-    }catch(error){
-        alert(error)
+  const handleSubmit = async () => {
+    try {
+      if (!content.trim()) {
+        alert("Content cannot be empty");
+        return;
+      }
+  
+      // Prepare the request payload
+      const payload = {
+        content: content.trim(), // Text content of the post
+        privacy: privacy, // Privacy setting: "public", "almost_private", or "private"
+        allowed_users: privacy === "private" ? selectedUsers : [], // Selected users if privacy is private
+      };
+  
+      // Send the POST request to the server
+      const response = await fetch("http://localhost:8080/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Include cookies in the request
+        body: JSON.stringify(payload), // Send the JSON payload
+      });
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to create post");
+      }
+  
+      const result = await response.text();
+      alert(result); // Show success message
+  
+      // Reset the form
+      setContent("");
+      setPrivacy("public");
+      setSelectedUsers([]);
+      setImage(null);
+      onCreatePost(payload); // Notify parent component if needed
+      onClose(); // Close the dialog
+    } catch (error) {
+      console.error("Error creating post:", error);
+      alert("Failed to create post. Please try again.");
     }
-  }
+  };
+  
+  
 
   // Mock user list for demonstration
   const userList = ["User1", "User2", "User3", "User4", "User5"]
