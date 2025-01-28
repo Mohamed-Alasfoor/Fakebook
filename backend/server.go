@@ -12,6 +12,7 @@ import (
 	"social-network/pkg/notifications"
 	"social-network/pkg/posts"
 	"social-network/pkg/users"
+	"social-network/pkg/sessions"
 )
 
 func main() {
@@ -21,6 +22,9 @@ func main() {
 
 	// Apply migrations
 	sqlite.ApplyMigrations(db)
+
+	// Assign the database connection to the sessions package
+	sessions.DB = db
 
 	// Create a new ServeMux to manage routes
 	mux := http.NewServeMux()
