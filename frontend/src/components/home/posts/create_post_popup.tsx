@@ -1,29 +1,45 @@
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { X, Image, User, Globe, Lock, Users } from "lucide-react"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { X, Image, User, Globe, Lock, Users } from "lucide-react";
 
 interface CreatePostPopupProps {
-  isOpen: boolean
-  onClose: () => void
-  onCreatePost: (post: any) => void
+  isOpen: boolean;
+  onClose: () => void;
+  onCreatePost: (post: any) => void;
 }
 
-export function CreatePostPopup({ isOpen, onClose, onCreatePost }: CreatePostPopupProps) {
-  const [content, setContent] = useState("")
-  const [image, setImage] = useState<File | null>(null)
-  const [privacy, setPrivacy] = useState("public")
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+export function CreatePostPopup({
+  isOpen,
+  onClose,
+  onCreatePost,
+}: CreatePostPopupProps) {
+  const [content, setContent] = useState("");
+  const [image, setImage] = useState<File | null>(null);
+  const [privacy, setPrivacy] = useState("public");
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setImage(e.target.files[0])
+      setImage(e.target.files[0]);
     }
-  }
+  };
 
   const handleSubmit = async () => {
     try {
@@ -31,55 +47,58 @@ export function CreatePostPopup({ isOpen, onClose, onCreatePost }: CreatePostPop
         alert("Content cannot be empty");
         return;
       }
-  
-      // Prepare the request payload
-      const payload = {
-        content: content.trim(), // Text content of the post
-        privacy: privacy, // Privacy setting: "public", "almost_private", or "private"
-        allowed_users: privacy === "private" ? selectedUsers : [], // Selected users if privacy is private
-      };
-  
-      // Send the POST request to the server
+
+      // Create FormData object for multipart/form-data request
+      const formData = new FormData();
+      formData.append("content", content.trim()); // Add text content
+      formData.append("privacy", privacy); // Add privacy setting
+      if (image) {
+        formData.append("file", image); // Add image file if it exists
+      }
+      if (privacy === "private") {
+        selectedUsers.forEach((user) =>
+          formData.append("allowed_users[]", user)
+        );
+      }
+
+      // Send the POST request to the backend
       const response = await fetch("http://localhost:8080/posts", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        body: formData, // Use FormData directly as the body
         credentials: "include", // Include cookies in the request
-        body: JSON.stringify(payload), // Send the JSON payload
       });
-  
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to create post");
       }
-  
-      const result = await response.text();
-      alert(result); // Show success message
-  
+
+      const result = await response.json();
+      alert(`Post created successfully! Image URL: ${result.image_url}`); // Show success message
+
       // Reset the form
       setContent("");
       setPrivacy("public");
       setSelectedUsers([]);
       setImage(null);
-      onCreatePost(payload); // Notify parent component if needed
+      onCreatePost(result); // Notify parent component
       onClose(); // Close the dialog
     } catch (error) {
       console.error("Error creating post:", error);
       alert("Failed to create post. Please try again.");
     }
   };
-  
-  
 
   // Mock user list for demonstration
-  const userList = ["User1", "User2", "User3", "User4", "User5"]
+  const userList = ["User1", "User2", "User3", "User4", "User5"];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Create New Post</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">
+            Create New Post
+          </DialogTitle>
         </DialogHeader>
         <div className="grid gap-6 py-4">
           <Textarea
@@ -94,10 +113,20 @@ export function CreatePostPopup({ isOpen, onClose, onCreatePost }: CreatePostPop
               className="cursor-pointer flex items-center gap-2 text-[#6C5CE7] hover:text-[#6C5CE7]/80"
             >
               <Image className="h-6 w-6" />
-              <span className="text-base font-medium">{image ? "Change Image" : "Add Image"}</span>
+              <span className="text-base font-medium">
+                {image ? "Change Image" : "Add Image"}
+              </span>
             </Label>
-            <Input id="image-upload" type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-            {image && <span className="text-sm text-gray-500">{image.name}</span>}
+            <Input
+              id="image-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              className="hidden"
+            />
+            {image && (
+              <span className="text-sm text-gray-500">{image.name}</span>
+            )}
           </div>
           <Select value={privacy} onValueChange={setPrivacy}>
             <SelectTrigger className="w-full text-base">
@@ -129,7 +158,10 @@ export function CreatePostPopup({ isOpen, onClose, onCreatePost }: CreatePostPop
               <Label htmlFor="user-select" className="mb-2 block font-medium">
                 Select users who can see this post:
               </Label>
-              <Select value={selectedUsers.join(",")} onValueChange={(value) => setSelectedUsers(value.split(","))}>
+              <Select
+                value={selectedUsers.join(",")}
+                onValueChange={(value) => setSelectedUsers(value.split(","))}
+              >
                 <SelectTrigger id="user-select" className="text-base">
                   <SelectValue placeholder="Select users" />
                 </SelectTrigger>
@@ -157,6 +189,5 @@ export function CreatePostPopup({ isOpen, onClose, onCreatePost }: CreatePostPop
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
-
