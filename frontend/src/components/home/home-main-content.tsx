@@ -123,7 +123,7 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
 
             {post.image_url && (
               <img
-                src={post.image_url || "/profile.png"}
+                src={"http://localhost:8080/uploads/"+post.image_url }
                 alt="Post image"
                 className="w-full rounded-lg mb-4"
               />
