@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-
+  "social-network/pkg/sessions"
 	"github.com/google/uuid"
 )
 
@@ -20,8 +20,14 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		//the logged-in user ID from session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
 		var request struct {
-			FollowerID string `json:"follower_id"`
 			FollowedID string `json:"followed_id"`
 		}
 
@@ -30,35 +36,21 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		log.Printf("Decoded request: FollowerID=%s, FollowedID=%s", request.FollowerID, request.FollowedID)
+		log.Printf("Decoded request: UserID=%s, FollowedID=%s", userID, request.FollowedID)
 
 		// Validate fields
-		if request.FollowerID == "" {
-			log.Println("Missing follower_id in the request.")
-			http.Error(w, "Missing follower_id", http.StatusBadRequest)
-			return
-		}
-
 		if request.FollowedID == "" {
-			log.Println("Missing followed_id in the request.")
 			http.Error(w, "Missing followed_id", http.StatusBadRequest)
 			return
 		}
 
-		if request.FollowerID == request.FollowedID {
-			log.Println("Attempt to follow self detected.")
+		if userID == request.FollowedID {
 			http.Error(w, "You cannot follow yourself", http.StatusBadRequest)
 			return
 		}
 
-		// Check if both users exist
-		var followerExists, followedExists bool
-		err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)`, request.FollowerID).Scan(&followerExists)
-		if err != nil || !followerExists {
-			http.Error(w, "Follower not found", http.StatusNotFound)
-			return
-		}
-
+		// Check if the followed user exists
+		var followedExists bool
 		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)`, request.FollowedID).Scan(&followedExists)
 		if err != nil || !followedExists {
 			http.Error(w, "Followed user not found", http.StatusNotFound)
@@ -69,7 +61,7 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 		var existingStatus string
 		err = db.QueryRow(`
 			SELECT status FROM followers WHERE follower_id = ? AND followed_id = ?
-		`, request.FollowerID, request.FollowedID).Scan(&existingStatus)
+		`, userID, request.FollowedID).Scan(&existingStatus)
 
 		if err == nil {
 			if existingStatus == "accepted" {
@@ -100,7 +92,7 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 			_, err := db.Exec(`
 				INSERT INTO followers (id, follower_id, followed_id, status, request_type)
 				VALUES (?, ?, ?, 'pending', 'manual')
-			`, uuid.New().String(), request.FollowerID, request.FollowedID)
+			`, uuid.New().String(), userID, request.FollowedID)
 			if err != nil {
 				log.Printf("Error inserting follow request: %v", err)
 				http.Error(w, "Failed to send follow request", http.StatusInternalServerError)
@@ -112,7 +104,7 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 			_, err := db.Exec(`
 				INSERT INTO followers (id, follower_id, followed_id, status, request_type)
 				VALUES (?, ?, ?, 'accepted', 'auto')
-			`, uuid.New().String(), request.FollowerID, request.FollowedID)
+			`, uuid.New().String(), userID, request.FollowedID)
 			if err != nil {
 				log.Printf("Error inserting follow relationship: %v", err)
 				http.Error(w, "Failed to follow user", http.StatusInternalServerError)
@@ -131,8 +123,14 @@ func UnfollowHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		//the logged-in user ID from session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
 		var request struct {
-			FollowerID string `json:"follower_id"`
 			FollowedID string `json:"followed_id"`
 		}
 
@@ -141,10 +139,33 @@ func UnfollowHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err := db.Exec(`
+		// Validate followed user ID
+		if request.FollowedID == "" {
+			http.Error(w, "Missing followed_id", http.StatusBadRequest)
+			return
+		}
+
+		// Check if follow relationship exists
+		var exists bool
+		err = db.QueryRow(`
+			SELECT EXISTS(SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = ?)
+		`, userID, request.FollowedID).Scan(&exists)
+
+		if err != nil {
+			http.Error(w, "Failed to check follow status", http.StatusInternalServerError)
+			return
+		}
+
+		if !exists {
+			http.Error(w, "You are not following this user", http.StatusBadRequest)
+			return
+		}
+
+		//Remove the follow relationship from the database
+		_, err = db.Exec(`
 			DELETE FROM followers
 			WHERE follower_id = ? AND followed_id = ?
-		`, request.FollowerID, request.FollowedID)
+		`, userID, request.FollowedID)
 		if err != nil {
 			http.Error(w, "Failed to unfollow user", http.StatusInternalServerError)
 			return
@@ -154,7 +175,8 @@ func UnfollowHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// GetFollowersHandler fetches the followers of a user
+
+// GetFollowersHandler fetches the followers of the logged-in user
 func GetFollowersHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -162,9 +184,10 @@ func GetFollowersHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		userID := r.URL.Query().Get("user_id")
-		if userID == "" {
-			http.Error(w, "Missing user_id parameter", http.StatusBadRequest)
+		// Get the logged-in user ID from the session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
 
@@ -190,7 +213,8 @@ func GetFollowersHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// HandleFollowRequest allows accepting or declining follow requests
+
+// HandleFollowRequest allows the logged-in user to accept or decline follow requests
 func HandleFollowRequest(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
@@ -198,9 +222,15 @@ func HandleFollowRequest(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Get the logged-in user ID from the session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
 		var request struct {
 			FollowerID string `json:"follower_id"`
-			FollowedID string `json:"followed_id"`
 			Action     string `json:"action"` // "accept" or "decline"
 		}
 
@@ -209,35 +239,14 @@ func HandleFollowRequest(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Validate action
 		if request.Action != "accept" && request.Action != "decline" {
 			http.Error(w, "Invalid action, must be 'accept' or 'decline'", http.StatusBadRequest)
 			return
 		}
 
-		// Verify a pending follow request exists
-		var existingStatus string
-		err := db.QueryRow(`
-			SELECT status FROM followers WHERE follower_id = ? AND followed_id = ? AND status = 'pending'
-		`, request.FollowerID, request.FollowedID).Scan(&existingStatus)
-
-		if err == sql.ErrNoRows {
-			http.Error(w, "No pending follow request found", http.StatusNotFound)
-			return
-		} else if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		// Update status
-		newStatus := "accepted"
-		if request.Action == "decline" {
-			newStatus = "declined"
-		}
-
-		result, err := db.Exec(`
-			UPDATE followers SET status = ? WHERE follower_id = ? AND followed_id = ?
-		`, newStatus, request.FollowerID, request.FollowedID)
+		// Ensure the logged-in user is the one being followed (FollowedID)
+		result, err := db.Exec(`UPDATE followers SET status = ? WHERE follower_id = ? AND followed_id = ? AND status = 'pending'`,
+			request.Action, request.FollowerID, userID)
 		if err != nil {
 			http.Error(w, "Failed to update follow request", http.StatusInternalServerError)
 			return
@@ -262,45 +271,36 @@ func GetFollowRequestsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		followedID := r.URL.Query().Get("followed_id")
-		if followedID == "" {
-			http.Error(w, "Missing followed_id parameter", http.StatusBadRequest)
+		// Get the logged-in user ID from the session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
 
+		// Fetch only requests for the logged-in user
 		rows, err := db.Query(`
-			SELECT id, follower_id, status, created_at
-			FROM followers
-			WHERE followed_id = ? AND status = 'pending'
-		`, followedID)
+			SELECT follower_id FROM followers WHERE followed_id = ? AND status = 'pending'
+		`, userID)
 		if err != nil {
 			http.Error(w, "Failed to fetch follow requests", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
-		var requests []struct {
-			ID         string `json:"id"`
-			FollowerID string `json:"follower_id"`
-			Status     string `json:"status"`
-			CreatedAt  string `json:"created_at"`
-		}
-
+		var requests []string
 		for rows.Next() {
-			var request struct {
-				ID         string `json:"id"`
-				FollowerID string `json:"follower_id"`
-				Status     string `json:"status"`
-				CreatedAt  string `json:"created_at"`
-			}
-			if err := rows.Scan(&request.ID, &request.FollowerID, &request.Status, &request.CreatedAt); err != nil {
+			var followerID string
+			if err := rows.Scan(&followerID); err != nil {
 				http.Error(w, "Failed to parse follow requests", http.StatusInternalServerError)
 				return
 			}
-			requests = append(requests, request)
+			requests = append(requests, followerID)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(requests)
 	}
 }
+
+

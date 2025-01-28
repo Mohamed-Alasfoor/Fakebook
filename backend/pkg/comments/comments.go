@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"social-network/pkg/notifications"
+	"social-network/pkg/sessions"
+
 	"github.com/google/uuid"
 )
 
@@ -25,20 +27,33 @@ func AddCommentHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		var comment Comment
+		// Retrieve user ID from session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		var comment struct {
+			PostID   string `json:"post_id"`
+			Content  string `json:"content"`
+			ImageURL string `json:"image_url,omitempty"`
+		}
+
 		if err := json.NewDecoder(r.Body).Decode(&comment); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-			// Generate a unique ID for the comment
-			commentID := uuid.New().String()
+
+		// Generate a unique ID for the comment
+		commentID := uuid.New().String()
 
 		// Insert the comment into the database
 		query := `
 			INSERT INTO comments (id, post_id, user_id, content, image_url)
 			VALUES (?, ?, ?, ?, ?)
 		`
-		_, err := db.Exec(query, commentID, comment.PostID, comment.UserID, comment.Content, comment.ImageURL)
+		_, err = db.Exec(query, commentID, comment.PostID, userID, comment.Content, comment.ImageURL)
 		if err != nil {
 			http.Error(w, "Failed to add comment", http.StatusInternalServerError)
 			return
@@ -52,8 +67,8 @@ func AddCommentHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Use utility function to add a notification
-		err = notifications.CreateNotification(db, postOwnerID, "comment", "Your post was commented on", comment.PostID, comment.UserID, "", "")
+		// Send notification to the post owner
+		err = notifications.CreateNotification(db, postOwnerID, "comment", "Your post was commented on", comment.PostID, userID, "", "")
 		if err != nil {
 			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
 			return
@@ -72,6 +87,13 @@ func DeleteCommentHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Retrieve user ID from session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
 		// Extract comment_id from query params
 		commentID := r.URL.Query().Get("comment_id")
 		if commentID == "" {
@@ -79,12 +101,26 @@ func DeleteCommentHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Check if the comment belongs to the user
+		var ownerID string
+		err = db.QueryRow(`SELECT user_id FROM comments WHERE id = ?`, commentID).Scan(&ownerID)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Comment not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			http.Error(w, "Failed to verify comment ownership", http.StatusInternalServerError)
+			return
+		}
+
+		// Ensure the logged-in user is the owner
+		if ownerID != userID {
+			http.Error(w, "Unauthorized: You can only delete your own comments", http.StatusForbidden)
+			return
+		}
+
 		// Delete the comment from the database
-		query := `
-			DELETE FROM comments
-			WHERE id = ?
-		`
-		_, err := db.Exec(query, commentID)
+		query := `DELETE FROM comments WHERE id = ?`
+		_, err = db.Exec(query, commentID)
 		if err != nil {
 			http.Error(w, "Failed to delete comment", http.StatusInternalServerError)
 			return
@@ -138,4 +174,3 @@ func GetCommentsByPostHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(comments)
 	}
 }
-

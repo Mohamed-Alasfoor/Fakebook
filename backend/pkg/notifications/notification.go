@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"github.com/google/uuid"
+	"social-network/pkg/sessions"
 )
 
 type Notification struct {
@@ -57,13 +58,13 @@ func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
-
-		userID := r.URL.Query().Get("user_id")
-		if userID == "" {
-			http.Error(w, "Missing user_id parameter", http.StatusBadRequest)
+    //Retrieve user ID from session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
-
+		
 		rows, err := db.Query(`
 			SELECT id, user_id, type, content, post_id, related_user_id, group_id, event_id, read, created_at
 			FROM notifications

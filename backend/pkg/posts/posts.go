@@ -45,22 +45,16 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Retrieve user ID from session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
 		// Retrieve the text fields
 		content := r.FormValue("content")
 		privacy := r.FormValue("privacy")
-		userID := r.FormValue("user_id")
-
-		// Validate that user_id exists in the users table
-		var userExists bool
-		err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)`, userID).Scan(&userExists)
-		if err != nil {
-			http.Error(w, "Failed to validate user", http.StatusInternalServerError)
-			return
-		}
-		if !userExists {
-			http.Error(w, "Invalid user_id. User does not exist.", http.StatusBadRequest)
-			return
-		}
 
 		// Validate privacy (optional)
 		if privacy == "" {
@@ -144,9 +138,6 @@ func contains(slice []string, item string) bool {
 }
 
 
-
-
-
 // GetPostsHandler fetches all posts based on privacy and includes if the user has liked each post
 func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -156,13 +147,13 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Retrieve the user_id from the session
-		requesterID, err := sessions.GetUserIDFromSession(r)
+		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
 
-		// SQL query to fetch posts with valid user references
+		// SQL query to fetch posts with correct privacy filtering
 		query := `
 			SELECT 
 				posts.id, 
@@ -180,12 +171,14 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 			INNER JOIN users ON posts.user_id = users.id
 			WHERE
 				posts.privacy = 'public'
-				OR (posts.privacy = 'almost_private' AND posts.user_id IN (SELECT followed_id FROM followers WHERE follower_id = ?))
-				OR (posts.privacy = 'private' AND posts.id IN (SELECT post_id FROM post_privacy WHERE user_id = ?))
+				OR (posts.privacy = 'almost_private' AND posts.user_id IN 
+					(SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted'))
+				OR (posts.privacy = 'private' AND (posts.user_id = ? OR posts.id IN 
+					(SELECT post_id FROM post_privacy WHERE user_id = ?)))
 			ORDER BY posts.created_at DESC;
 		`
 
-		rows, err := db.Query(query, requesterID, requesterID, requesterID)
+		rows, err := db.Query(query, userID, userID, userID, userID)
 		if err != nil {
 			http.Error(w, "Failed to fetch posts", http.StatusInternalServerError)
 			return
@@ -209,9 +202,7 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 
 			post.Nickname = nickname
 			post.Avatar = avatar
-
-			// Add the 'has_liked' attribute to the post JSON response
-			post.HasLiked = hasLiked
+			post.HasLiked = hasLiked // Include the user's like status
 
 			posts = append(posts, post)
 		}
@@ -223,9 +214,6 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 
 
 
-
-
-
 // UpdatePostPrivacyHandler updates the privacy of a post
 func UpdatePostPrivacyHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -234,10 +222,18 @@ func UpdatePostPrivacyHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Retrieve user ID from session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		// Parse the request body
 		var updateRequest struct {
 			PostID       string   `json:"post_id"`
 			Privacy      string   `json:"privacy"`
-			AllowedUsers []string `json:"allowed_users"` // Only for private posts
+			AllowedUsers []string `json:"allowed_users,omitempty"` // Only for private posts
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&updateRequest); err != nil {
@@ -245,8 +241,25 @@ func UpdatePostPrivacyHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Check if the user is the owner of the post
+		var ownerID string
+		err = db.QueryRow(`SELECT user_id FROM posts WHERE id = ?`, updateRequest.PostID).Scan(&ownerID)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Post not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			http.Error(w, "Failed to check post ownership", http.StatusInternalServerError)
+			return
+		}
+
+		// Ensure the logged-in user is the owner
+		if ownerID != userID {
+			http.Error(w, "Unauthorized: You can only update your own post's privacy", http.StatusForbidden)
+			return
+		}
+
 		// Update the privacy in the database
-		_, err := db.Exec(`UPDATE posts SET privacy = ? WHERE id = ?`, updateRequest.Privacy, updateRequest.PostID)
+		_, err = db.Exec(`UPDATE posts SET privacy = ? WHERE id = ?`, updateRequest.Privacy, updateRequest.PostID)
 		if err != nil {
 			http.Error(w, "Failed to update privacy", http.StatusInternalServerError)
 			return
@@ -262,8 +275,8 @@ func UpdatePostPrivacyHandler(db *sql.DB) http.HandlerFunc {
 			}
 
 			// Add new allowed users
-			for _, userID := range updateRequest.AllowedUsers {
-				_, err := db.Exec(`INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)`, updateRequest.PostID, userID)
+			for _, allowedUserID := range updateRequest.AllowedUsers {
+				_, err := db.Exec(`INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)`, updateRequest.PostID, allowedUserID)
 				if err != nil {
 					http.Error(w, "Failed to update private post permissions", http.StatusInternalServerError)
 					return
@@ -274,6 +287,7 @@ func UpdatePostPrivacyHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Post privacy updated successfully"))
 	}
 }
+
 
 // DeletePostHandler allows a user to delete their own post
 func DeletePostHandler(db *sql.DB) http.HandlerFunc {
@@ -290,9 +304,33 @@ func DeletePostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Retrieve user ID from session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		// Ensure the user is the owner of the post before deletion
+		var ownerID string
+		err = db.QueryRow(`SELECT user_id FROM posts WHERE id = ?`, postID).Scan(&ownerID)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Post not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			http.Error(w, "Failed to check post ownership", http.StatusInternalServerError)
+			return
+		}
+
+		// Check if the user owns the post
+		if ownerID != userID {
+			http.Error(w, "Unauthorized: You can only delete your own posts", http.StatusForbidden)
+			return
+		}
+
 		// Delete the post from the database
 		query := `DELETE FROM posts WHERE id = ?`
-		_, err := db.Exec(query, postID)
+		_, err = db.Exec(query, postID)
 		if err != nil {
 			http.Error(w, "Failed to delete post", http.StatusInternalServerError)
 			return
@@ -308,3 +346,4 @@ func DeletePostHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Post deleted successfully"))
 	}
 }
+
