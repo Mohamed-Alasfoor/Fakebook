@@ -5,12 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"social-network/pkg/sessions"
-	"github.com/google/uuid"
-	"strings"
-	"path/filepath"
-	"io"
-	"os"
 
+	"github.com/google/uuid"
 )
 
 type Post struct {
@@ -38,13 +34,6 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Parse multipart form with a max upload size of 10 MB
-		const maxUploadSize = 10 << 20 // 10 MB
-		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
-			http.Error(w, "File is too large. Max size is 10 MB.", http.StatusBadRequest)
-			return
-		}
-
 		// Retrieve user ID from session
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
@@ -52,47 +41,30 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Retrieve the text fields
-		content := r.FormValue("content")
-		privacy := r.FormValue("privacy")
+		// Parse JSON body
+		var requestData struct {
+			Content      string   `json:"content"`
+			Privacy      string   `json:"privacy"`
+			AllowedUsers []string `json:"allowed_users,omitempty"`
+		}
 
-		// Validate privacy (optional)
+		if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+			http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+			return
+		}
+
+		// Validate content
+		if requestData.Content == "" {
+			http.Error(w, "Content cannot be empty", http.StatusBadRequest)
+			return
+		}
+
+		// Validate privacy
+		privacy := requestData.Privacy
 		if privacy == "" {
-			privacy = "public" // Default privacy
+			privacy = "public"
 		} else if privacy != "public" && privacy != "almost_private" && privacy != "private" {
 			http.Error(w, "Invalid privacy setting", http.StatusBadRequest)
-			return
-		}
-
-		// Handle the file upload
-		file, fileHeader, err := r.FormFile("file") // "file" is the field name in the form
-		if err != nil {
-			http.Error(w, "File upload failed. Ensure you included an image.", http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
-
-		// Validate the file type
-		allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif"}
-		fileExt := strings.ToLower(filepath.Ext(fileHeader.Filename))
-		if !contains(allowedExtensions, fileExt) {
-			http.Error(w, "Invalid file type. Only .jpg, .jpeg, .png, and .gif are allowed.", http.StatusBadRequest)
-			return
-		}
-
-		// Generate a unique file name and save the file
-		fileName := uuid.New().String() + fileExt
-		filePath := filepath.Join("uploads", fileName) // Make sure the "uploads" directory exists
-		outFile, err := os.Create(filePath)
-		if err != nil {
-			http.Error(w, "Failed to save file", http.StatusInternalServerError)
-			return
-		}
-		defer outFile.Close()
-
-		// Copy the uploaded file to the server
-		if _, err := io.Copy(outFile, file); err != nil {
-			http.Error(w, "Failed to save file", http.StatusInternalServerError)
 			return
 		}
 
@@ -104,16 +76,15 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 			INSERT INTO posts (id, user_id, content, image_url, privacy)
 			VALUES (?, ?, ?, ?, ?)
 		`
-		_, err = db.Exec(query, postID, userID, content, "/"+filePath, privacy) // Save the relative path
+		_, err = db.Exec(query, postID, userID, requestData.Content, "", privacy)
 		if err != nil {
 			http.Error(w, "Failed to create post", http.StatusInternalServerError)
 			return
 		}
 
-		// Handle private posts: add allowed users to post_privacy
+		// Handle private posts
 		if privacy == "private" {
-			allowedUsers := r.Form["allowed_users"] // Retrieve as a slice of user IDs
-			for _, allowedUserID := range allowedUsers {
+			for _, allowedUserID := range requestData.AllowedUsers {
 				_, err := db.Exec(`INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)`, postID, allowedUserID)
 				if err != nil {
 					http.Error(w, "Failed to set private post permissions", http.StatusInternalServerError)
@@ -126,6 +97,7 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Post created successfully"))
 	}
 }
+
 
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
