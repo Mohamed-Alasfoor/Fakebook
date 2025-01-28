@@ -197,7 +197,7 @@ export default function ChatOnnExactPage() {
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
           {/* Left: Brand Name */}
           <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-            Chat ONN
+            Social Chat 
           </Typography>
 
           {/* Middle icons (unchanged) */}
