@@ -13,6 +13,9 @@ import (
 	"social-network/pkg/posts"
 	"social-network/pkg/sessions"
 	"social-network/pkg/users"
+	"social-network/pkg/groups"
+	"social-network/pkg/events"
+	"social-network/pkg/rsvp"
 )
 
 func main() {
@@ -32,7 +35,7 @@ func main() {
 	// Public Routes
 	mux.HandleFunc("/register", auth.RegisterHandler(db))
 	mux.HandleFunc("/login", auth.LoginHandler(db))
-	mux.HandleFunc("/logout", auth.LogoutHandler(db)) // Updated to include `db`
+	mux.HandleFunc("/logout", auth.LogoutHandler(db)) 
 
 	// Posts
 	mux.HandleFunc("/posts", posts.CreatePostHandler(db))
@@ -63,6 +66,30 @@ func main() {
 
 	// User Privacy
 	mux.HandleFunc("/users/privacy", users.UpdatePrivacyHandler(db))
+
+
+// Groups endpoints
+  mux.HandleFunc("/groups", groups.GetAllGroupsHandler(db))                    // Fetch all groups for browsing
+  mux.HandleFunc("/groups/search", groups.SearchGroupsHandler(db))             // Search for groups by name
+  mux.HandleFunc("/groups/create", groups.CreateGroupHandler(db))              // Create a new group
+  mux.HandleFunc("/groups/join", groups.RequestToJoinHandler(db))              // Request to join a group
+  mux.HandleFunc("/groups/join/respond", groups.HandleJoinRequestHandler(db))  // Accept/decline a join request
+  mux.HandleFunc("/groups/invite", groups.SendInvitationHandler(db))           // Send a group invitation
+  mux.HandleFunc("/groups/invite/respond", groups.HandleInvitationHandler(db)) // Accept/decline a group invitation
+  mux.HandleFunc("/groups/leave", groups.LeaveGroupHandler(db))                // Leave a group
+  mux.HandleFunc("/groups/user", groups.GetUserGroupsHandler(db))              // Get all groups a user belongs to
+  mux.HandleFunc("/groups/requests", groups.GetPendingRequestsHandler(db))     // Get all pending join requests for a creator's groups
+  mux.HandleFunc("/groups/remove", groups.RemoveMemberHandler(db))             // Remove a member from a group (only for creator)
+  mux.HandleFunc("/groups/delete", groups.DeleteGroupHandler(db))              // Delete a group (only for creator)
+  mux.HandleFunc("/groups/members", groups.GetGroupMembersHandler(db))         // Get a list of all members in a group
+
+
+	
+		// Event Routes
+		mux.HandleFunc("/events/create", events.CreateEventHandler(db))
+	
+		// RSVP Routes
+		mux.HandleFunc("/events/rsvp", rsvp.RSVPHandler(db))
 
 
 	// Protected Routes (require authentication)
