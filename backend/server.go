@@ -84,7 +84,16 @@ func main() {
   mux.HandleFunc("/groups/members", groups.GetGroupMembersHandler(db))         // Get a list of all members in a group
 
 
-	
+// Group Posts 
+  mux.HandleFunc("/groups/posts/create", groups.CreateGroupPostHandler(db))       // Create a group post
+  mux.HandleFunc("/groups/posts/delete", groups.DeleteGroupPostHandler(db))       // Delete a group post
+  mux.HandleFunc("/groups/posts", groups.GetGroupPostsHandler(db))                // Fetch all posts in a group
+
+// Group Post Comments
+  mux.HandleFunc("/groups/posts/comments/create", groups.CreateGroupPostCommentHandler(db)) // Add comment to group post
+  mux.HandleFunc("/groups/posts/comments", groups.GetGroupPostCommentsHandler(db))         // Fetch comments for a post
+  mux.HandleFunc("/groups/posts/comments/delete", groups.DeleteGroupPostCommentHandler(db)) // Delete comment
+
 		// Event Routes
 		mux.HandleFunc("/events/create", events.CreateEventHandler(db))
 	
