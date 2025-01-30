@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"io"
 	"strings"
+	"social-network/pkg/notifications"
+	"fmt"
 )
 
 type Group struct {
@@ -136,7 +138,6 @@ func RequestToJoinHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Get user ID from session
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -152,15 +153,21 @@ func RequestToJoinHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err = db.Exec(`
-			INSERT INTO group_membership (id, group_id, user_id, status) 
-			VALUES (?, ?, ?, 'pending_request')`, uuid.New().String(), request.GroupID, userID)
+		_, err = db.Exec(`INSERT INTO group_membership (id, group_id, user_id, status) VALUES (?, ?, ?, 'pending_request')`,
+			uuid.New().String(), request.GroupID, userID)
 		if err != nil {
 			http.Error(w, "Failed to send join request", http.StatusInternalServerError)
 			return
 		}
 
-		w.WriteHeader(http.StatusCreated)
+		// Notify the group creator
+		var creatorID string
+		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&creatorID)
+		if err == nil {
+			notifications.CreateNotification(db, creatorID, "group_join_request",
+				"A user has requested to join your group", "", userID, request.GroupID, "")
+		}
+
 		w.Write([]byte("Join request sent"))
 	}
 }
@@ -192,8 +199,8 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Ensure only the group creator can approve/decline requests
-		var ownerID string
-		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&ownerID)
+		var ownerID, groupName string
+		err = db.QueryRow(`SELECT creator_id, name FROM groups WHERE id = ?`, request.GroupID).Scan(&ownerID, &groupName)
 		if err == sql.ErrNoRows {
 			http.Error(w, "Group not found", http.StatusNotFound)
 			return
@@ -207,11 +214,14 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Handle actions
+		// Handle actions & send notifications
+		var notificationMsg string
 		if request.Action == "accept" {
 			_, err = db.Exec(`UPDATE group_membership SET status = 'member' WHERE group_id = ? AND user_id = ? AND status = 'pending_request'`, request.GroupID, request.UserID)
+			notificationMsg = fmt.Sprintf("Your request to join %s has been approved.", groupName)
 		} else {
 			_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'pending_request'`, request.GroupID, request.UserID)
+			notificationMsg = fmt.Sprintf("Your request to join %s has been declined.", groupName)
 		}
 
 		if err != nil {
@@ -219,65 +229,79 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		//Notify the user
+		_ = notifications.CreateNotification(db, request.UserID, "group_join_request", notificationMsg, "", creatorID, request.GroupID, "")
+
 		w.Write([]byte("Join request " + request.Action + "ed successfully"))
 	}
 }
 
-
-// SendInvitationHandler - Allows group creator to send invitations
+// Allows any group member to send invitations
 func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-			return
-		}
+			if r.Method != http.MethodPost {
+					http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+					return
+			}
 
-		// Get user ID from session
-		creatorID, err := sessions.GetUserIDFromSession(r)
-		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
+			// Get user ID from session
+			inviterID, err := sessions.GetUserIDFromSession(r)
+			if err != nil {
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+			}
 
-		var invite struct {
-			GroupID string `json:"group_id"`
-			UserID  string `json:"user_id"`
-		}
+			var invite struct {
+					GroupID string `json:"group_id"`
+					UserID  string `json:"user_id"`
+			}
 
-		if err := json.NewDecoder(r.Body).Decode(&invite); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
-		}
+			if err := json.NewDecoder(r.Body).Decode(&invite); err != nil {
+					http.Error(w, "Invalid request body", http.StatusBadRequest)
+					return
+			}
 
-		// Ensure the request is made by the group creator
-		var ownerID string
-		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, invite.GroupID).Scan(&ownerID)
-		if err == sql.ErrNoRows {
-			http.Error(w, "Group not found", http.StatusNotFound)
-			return
-		} else if err != nil {
-			http.Error(w, "Failed to check group ownership", http.StatusInternalServerError)
-			return
-		}
+			// Check if the inviter is a member of the group (not just the creator)
+			var isMember bool
+			err = db.QueryRow(`
+					SELECT EXISTS(
+							SELECT 1 FROM group_membership 
+							WHERE group_id = ? AND user_id = ? AND status = 'member'
+					)`, invite.GroupID, inviterID).Scan(&isMember)
 
-		if ownerID != creatorID {
-			http.Error(w, "Unauthorized: Only the group creator can send invites", http.StatusForbidden)
-			return
-		}
+			if err != nil {
+					http.Error(w, "Failed to check group membership", http.StatusInternalServerError)
+					return
+			}
 
-		// Insert invitation with pending status
-		_, err = db.Exec(`
-			INSERT INTO group_membership (id, group_id, user_id, status) 
-			VALUES (?, ?, ?, 'pending_invite')`, uuid.New().String(), invite.GroupID, invite.UserID)
-		if err != nil {
-			http.Error(w, "Failed to send invitation", http.StatusInternalServerError)
-			return
-		}
+			if !isMember {
+					http.Error(w, "Unauthorized: Only group members can send invites", http.StatusForbidden)
+					return
+			}
 
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("Invitation sent successfully"))
+			// Insert invitation with pending status
+			_, err = db.Exec(`
+					INSERT INTO group_membership (id, group_id, user_id, status) 
+					VALUES (?, ?, ?, 'pending_invite')`, uuid.New().String(), invite.GroupID, invite.UserID)
+			if err != nil {
+					http.Error(w, "Failed to send invitation", http.StatusInternalServerError)
+					return
+			}
+
+			// Create notification for the invited user
+			err = notifications.CreateNotification(db, invite.UserID, "group_invite",
+					"You have been invited to join a group.", "", inviterID, invite.GroupID, "")
+			if err != nil {
+					http.Error(w, "Failed to create notification", http.StatusInternalServerError)
+					return
+			}
+
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte("Invitation sent successfully"))
 	}
 }
+
+
 
 // HandleInvitationHandler - Accept or Decline an invitation
 func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
@@ -309,11 +333,25 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Fetch the group creator
+		var creatorID string
+		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&creatorID)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Group not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			http.Error(w, "Failed to retrieve group details", http.StatusInternalServerError)
+			return
+		}
+
 		// Handle actions
+		var notificationMessage string
 		if request.Action == "accept" {
 			_, err = db.Exec(`UPDATE group_membership SET status = 'member' WHERE group_id = ? AND user_id = ? AND status = 'pending_invite'`, request.GroupID, userID)
+			notificationMessage = "A user accepted your group invitation."
 		} else {
 			_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'pending_invite'`, request.GroupID, userID)
+			notificationMessage = "A user declined your group invitation."
 		}
 
 		if err != nil {
@@ -321,9 +359,19 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Send notification to the group creator
+		err = notifications.CreateNotification(db, creatorID, "group_invite_response",
+			notificationMessage, "", userID, request.GroupID, "")
+		if err != nil {
+			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
+			return
+		}
+
 		w.Write([]byte("Invitation " + request.Action + "ed successfully"))
 	}
 }
+
+
 
 // LeaveGroupHandler - Allows users to leave a group
 func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {

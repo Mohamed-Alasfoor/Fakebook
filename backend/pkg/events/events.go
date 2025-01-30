@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"social-network/pkg/sessions"
 	"github.com/google/uuid"
+	"fmt"
+	"social-network/pkg/notifications"
 )
 
 type Event struct {
@@ -14,62 +16,80 @@ type Event struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	DateTime    string `json:"date_time"`
-	CreatorID   string `json:"creator_id"` // Consistent with migration file
+	CreatorID   string `json:"creator_id"`
 }
 
 // CreateEventHandler allows users to create events in groups
 func CreateGroupEventHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost {
-					http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-					return
+		if r.Method != http.MethodPost {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Get user ID from session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// Parse request body
+		var event struct {
+			GroupID     string `json:"group_id"`
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			DateTime    string `json:"date_time"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if event.GroupID == "" || event.Title == "" || event.Description == "" || event.DateTime == "" {
+			http.Error(w, "All fields are required", http.StatusBadRequest)
+			return
+		}
+
+		// Generate event ID
+		eventID := uuid.New().String()
+
+		// Insert event into database
+		_, err = db.Exec(`
+			INSERT INTO group_events (id, group_id, title, description, date_time, creator_id) 
+			VALUES (?, ?, ?, ?, ?, ?)`, 
+			eventID, event.GroupID, event.Title, event.Description, event.DateTime, userID)
+		if err != nil {
+			http.Error(w, "Failed to create event", http.StatusInternalServerError)
+			return
+		}
+
+		// Notify group members about the new event
+		rows, err := db.Query(`SELECT user_id FROM group_membership WHERE group_id = ? AND status = 'member' AND user_id != ?`, event.GroupID, userID)
+		if err != nil {
+			http.Error(w, "Failed to fetch group members", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var memberID string
+			if err := rows.Scan(&memberID); err == nil {
+				notificationMsg := fmt.Sprintf("A new event has been created in your group: %s", event.Title)
+				_ = notifications.CreateNotification(db, memberID, "group_event_created",
+					notificationMsg, "", userID, event.GroupID, eventID)
 			}
+		}
 
-			// Get user ID from session
-			userID, err := sessions.GetUserIDFromSession(r)
-			if err != nil {
-					http.Error(w, "Unauthorized", http.StatusUnauthorized)
-					return
-			}
-
-			// Parse request body
-			var event struct {
-					GroupID     string `json:"group_id"`
-					Title       string `json:"title"`
-					Description string `json:"description"`
-					DateTime    string `json:"date_time"`
-			}
-
-			if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-					http.Error(w, "Invalid request body", http.StatusBadRequest)
-					return
-			}
-
-			if event.GroupID == "" || event.Title == "" || event.Description == "" || event.DateTime == "" {
-					http.Error(w, "All fields are required", http.StatusBadRequest)
-					return
-			}
-
-			// Generate event ID
-			eventID := uuid.New().String()
-
-			// Insert event into database
-			_, err = db.Exec(`
-					INSERT INTO group_events (id, group_id, title, description, date_time, creator_id) 
-					VALUES (?, ?, ?, ?, ?, ?)`, 
-					eventID, event.GroupID, event.Title, event.Description, event.DateTime, userID)
-			if err != nil {
-					http.Error(w, "Failed to create event", http.StatusInternalServerError)
-					return
-			}
-
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]string{
-					"message": "Event created successfully",
-					"event_id": eventID,
-			})
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Event created successfully",
+			"event_id": eventID,
+		})
 	}
 }
+
  // Fetch Events in a Group
  func GetGroupEventsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

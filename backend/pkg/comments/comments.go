@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
+  "path/filepath"
 	"social-network/pkg/notifications"
 	"social-network/pkg/sessions"
 	"strings"
