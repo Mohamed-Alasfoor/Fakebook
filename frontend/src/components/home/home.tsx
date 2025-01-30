@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { LeftSidebar } from "@/components/home/leftSideBar";
 import { MainContent } from "@/components/home/mainContent";
-import { checkAuth } from "@/lib/hooks/checkAuth";
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -13,7 +12,23 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    checkAuth(setLoading, router);
+    const checkAuth = async () => {
+      try {
+        const response = await axios.get("http://localhost:8080/posts/all", { 
+          withCredentials: true,
+        });
+
+        if (response.status === 200 && response.data?.authenticated) {
+          setLoading(false); // User is authenticated
+        } else {
+          router.push("/login"); // Redirect to login page
+        }
+      } catch (error) {
+        router.push("/login"); // Redirect to login on error
+      }
+    };
+
+    checkAuth();
   }, [router]);
 
   if (loading) {
