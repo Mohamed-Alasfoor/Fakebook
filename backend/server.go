@@ -6,16 +6,16 @@ import (
 	"social-network/pkg/auth"
 	"social-network/pkg/comments"
 	"social-network/pkg/db/sqlite"
+	"social-network/pkg/events"
 	"social-network/pkg/followers"
+	"social-network/pkg/groups"
 	"social-network/pkg/likes"
 	"social-network/pkg/middleware"
 	"social-network/pkg/notifications"
 	"social-network/pkg/posts"
+	"social-network/pkg/rsvp"
 	"social-network/pkg/sessions"
 	"social-network/pkg/users"
-	"social-network/pkg/groups"
-	"social-network/pkg/events"
-	"social-network/pkg/rsvp"
 )
 
 func main() {
@@ -93,6 +93,12 @@ func main() {
   mux.HandleFunc("/groups/posts/comments/create", groups.CreateGroupPostCommentHandler(db)) // Add comment to group post
   mux.HandleFunc("/groups/posts/comments", groups.GetGroupPostCommentsHandler(db))         // Fetch comments for a post
   mux.HandleFunc("/groups/posts/comments/delete", groups.DeleteGroupPostCommentHandler(db)) // Delete comment
+
+  
+// Profile
+mux.HandleFunc("/users/profile", users.GetUserProfileHandler(db))
+mux.HandleFunc("/users/profile/update", users.UpdateProfileHandler(db))  
+mux.HandleFunc("/users/profile/privacy", users.TogglePrivacyHandler(db)) 
 
 		// Event Routes
 		mux.HandleFunc("/events/create", events.CreateEventHandler(db))
