@@ -95,18 +95,34 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Set session_id cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     "social-network-session",
 			Value:    sessionID,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   true,                      // Enable Secure flag
-			SameSite: http.SameSiteStrictMode,   // Enforce SameSite: Strict
+			Secure:   true,                      // Ensure secure transport
+			SameSite: http.SameSiteStrictMode,   // Prevent CSRF attacks
 			Expires:  expiresAt,                 // Set expiration time
 		})
 
+		// Set user_id cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "user_id",
+			Value:    userID,
+			Path:     "/",
+			HttpOnly: true,  // Keep it HttpOnly to prevent XSS attacks
+			Secure:   true,  // Ensure it's only sent over HTTPS
+			SameSite: http.SameSiteStrictMode,
+			Expires:  expiresAt,
+		})
+
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"session_id": "` + sessionID + `"}`))
+		json.NewEncoder(w).Encode(map[string]string{
+			"message":   "Login successful",
+			"session_id": sessionID,
+			"user_id":    userID, // Optionally return in JSON for frontend convenience
+		})
 	}
 }
 
