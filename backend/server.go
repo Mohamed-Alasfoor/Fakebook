@@ -13,7 +13,6 @@ import (
 	"social-network/pkg/middleware"
 	"social-network/pkg/notifications"
 	"social-network/pkg/posts"
-	"social-network/pkg/rsvp"
 	"social-network/pkg/sessions"
 	"social-network/pkg/users"
 )
@@ -96,15 +95,16 @@ func main() {
 
   
 // Profile
-mux.HandleFunc("/users/profile", users.GetUserProfileHandler(db))
-mux.HandleFunc("/users/profile/update", users.UpdateProfileHandler(db))  
-mux.HandleFunc("/users/profile/privacy", users.TogglePrivacyHandler(db)) 
+  mux.HandleFunc("/users/profile", users.GetUserProfileHandler(db))
+  mux.HandleFunc("/users/profile/update", users.UpdateProfileHandler(db))  
+  mux.HandleFunc("/users/profile/privacy", users.TogglePrivacyHandler(db)) 
 
-		// Event Routes
-		mux.HandleFunc("/events/create", events.CreateEventHandler(db))
-	
-		// RSVP Routes
-		mux.HandleFunc("/events/rsvp", rsvp.RSVPHandler(db))
+// Group Events Endpoints
+  mux.HandleFunc("/groups/events/create", events.CreateGroupEventHandler(db))   // Create an event in a group
+  mux.HandleFunc("/groups/events", events.GetGroupEventsHandler(db))            // Fetch events in a group
+  mux.HandleFunc("/groups/events/rsvp", events.RSVPGroupEventHandler(db))       // RSVP to an event
+  mux.HandleFunc("/groups/events/rsvps", events.GetRSVPsForEventHandler(db))    // Fetch RSVPs for an event
+  mux.HandleFunc("/groups/events/rsvp/remove", events.RemoveRSVPHandler(db))    // Remove RSVP
 
 
 	// Protected Routes (require authentication)

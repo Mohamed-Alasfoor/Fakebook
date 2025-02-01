@@ -3,9 +3,13 @@ package comments
 import (
 	"database/sql"
 	"encoding/json"
+	"io"
 	"net/http"
+	"os"
+  "path/filepath"
 	"social-network/pkg/notifications"
 	"social-network/pkg/sessions"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -19,65 +23,104 @@ type Comment struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// AddCommentHandler allows a user to add a comment
+// AddCommentHandler allows a user to add a comment, including optional images
 func AddCommentHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-			return
-		}
+    return func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodPost {
+            http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+            return
+        }
 
-		// Retrieve user ID from session
-		userID, err := sessions.GetUserIDFromSession(r)
+        // Parse multipart form with a max upload size (e.g., 10MB)
+        const maxUploadSize = 10 << 20 // 10 MB
+        err := r.ParseMultipartForm(maxUploadSize)
+        if err != nil {
+            http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+            return
+        }
+
+        // Retrieve user ID from session
+        userID, err := sessions.GetUserIDFromSession(r)
+        if err != nil {
+            http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+            return
+        }
+
+        // Retrieve form values
+        postID := r.FormValue("post_id")
+        content := r.FormValue("content")
+
+        if postID == "" || content == "" {
+            http.Error(w, "Post ID and content are required", http.StatusBadRequest)
+            return
+        }
+
+        // Handle file upload (optional)
+        var imageURL string
+        file, fileHeader, err := r.FormFile("file")
+        if err == nil { // File exists
+            defer file.Close()
+
+            allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif"}
+            fileExt := strings.ToLower(filepath.Ext(fileHeader.Filename))
+            if !contains(allowedExtensions, fileExt) {
+                http.Error(w, "Invalid file type. Only .jpg, .jpeg, .png, and .gif are allowed.", http.StatusBadRequest)
+                return
+            }
+
+            // Save file
+            fileName := uuid.New().String() + fileExt
+            savePath := filepath.Join("uploads", fileName)
+            outFile, err := os.Create(savePath)
+            if err != nil {
+                http.Error(w, "Failed to save file", http.StatusInternalServerError)
+                return
+            }
+            defer outFile.Close()
+
+            if _, err := io.Copy(outFile, file); err != nil {
+                http.Error(w, "Failed to write file", http.StatusInternalServerError)
+                return
+            }
+
+            imageURL = fileName
+        }
+
+        // Generate a unique comment ID
+        commentID := uuid.New().String()
+
+        // Insert the comment into the database
+        query := `
+            INSERT INTO comments (id, post_id, user_id, content, image_url)
+            VALUES (?, ?, ?, ?, ?)
+        `
+		_, err = db.Exec(query, commentID, postID, userID, content, imageURL)
 		if err != nil {
-			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			http.Error(w, "Failed to add comment: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		
 
-		var comment struct {
-			PostID   string `json:"post_id"`
-			Content  string `json:"content"`
-			ImageURL string `json:"image_url,omitempty"`
-		}
+        // Fetch the owner of the post
+        var postOwnerID string
+        err = db.QueryRow(`SELECT user_id FROM posts WHERE id = ?`, postID).Scan(&postOwnerID)
+        if err != nil {
+            http.Error(w, "Failed to retrieve post owner", http.StatusInternalServerError)
+            return
+        }
 
-		if err := json.NewDecoder(r.Body).Decode(&comment); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
-		}
+        // Send notification to the post owner
+        err = notifications.CreateNotification(db, postOwnerID, "comment", "Your post was commented on", postID, userID, "", "")
+        if err != nil {
+            http.Error(w, "Failed to create notification", http.StatusInternalServerError)
+            return
+        }
 
-		// Generate a unique ID for the comment
-		commentID := uuid.New().String()
-
-		// Insert the comment into the database
-		query := `
-			INSERT INTO comments (id, post_id, user_id, content, image_url)
-			VALUES (?, ?, ?, ?, ?)
-		`
-		_, err = db.Exec(query, commentID, comment.PostID, userID, comment.Content, comment.ImageURL)
-		if err != nil {
-			http.Error(w, "Failed to add comment", http.StatusInternalServerError)
-			return
-		}
-
-		// Fetch the owner of the post
-		var postOwnerID string
-		err = db.QueryRow(`SELECT user_id FROM posts WHERE id = ?`, comment.PostID).Scan(&postOwnerID)
-		if err != nil {
-			http.Error(w, "Failed to retrieve post owner", http.StatusInternalServerError)
-			return
-		}
-
-		// Send notification to the post owner
-		err = notifications.CreateNotification(db, postOwnerID, "comment", "Your post was commented on", comment.PostID, userID, "", "")
-		if err != nil {
-			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("Comment added successfully"))
-	}
+        w.WriteHeader(http.StatusCreated)
+        w.Write([]byte("Comment added successfully"))
+    }
 }
+
 
 // DeleteCommentHandler allows a user to delete their own comment
 func DeleteCommentHandler(db *sql.DB) http.HandlerFunc {
@@ -130,7 +173,7 @@ func DeleteCommentHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// GetCommentsByPostHandler fetches all comments for a specific post
+// GetCommentsByPostHandler fetches all comments for a post
 func GetCommentsByPostHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -138,14 +181,12 @@ func GetCommentsByPostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Extract post_id from query params
 		postID := r.URL.Query().Get("post_id")
 		if postID == "" {
 			http.Error(w, "Missing post_id parameter", http.StatusBadRequest)
 			return
 		}
 
-		// Query to fetch all comments for the specified post
 		rows, err := db.Query(`
 			SELECT id, post_id, user_id, content, image_url, created_at
 			FROM comments
@@ -158,7 +199,6 @@ func GetCommentsByPostHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		// Parse the result into a slice of Comment structs
 		var comments []Comment
 		for rows.Next() {
 			var comment Comment
@@ -169,8 +209,17 @@ func GetCommentsByPostHandler(db *sql.DB) http.HandlerFunc {
 			comments = append(comments, comment)
 		}
 
-		// Respond with JSON
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(comments)
 	}
+}
+
+// Helper function to check allowed file extensions
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
