@@ -1,68 +1,47 @@
-import { Post } from "@/types/post";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Heart, MessageCircle } from "lucide-react";
-import { useLikes } from "@/lib/hooks/useLikes"; 
-import { PostView } from "@/components/home/posts/postView"; 
+import { useState, useEffect } from "react";
+import { usePosts } from "@/lib/hooks/swr/getPosts";
+import PostItem from "@/components/home/posts/postItem";;
 
 interface PostsListProps {
-  posts: Post[];
+  posts: any[];
   isLoading: boolean;
   isError: boolean;
-  onSelectPost: (post: Post) => void;
-  refreshPosts: () => void;
+  onSelectPost: (post: any) => void;
 }
 
-export function PostsList({ posts, isLoading, isError, onSelectPost, refreshPosts }: PostsListProps) {
-  const { likesState, likesCount, handleLike } = useLikes(posts, refreshPosts);
 
-  if (isLoading) {
-    return <div>Loading posts...</div>;
-  }
+export default function PostsList({ posts, isLoading, isError, onSelectPost }: PostsListProps) {
+  const [likesState, setLikesState] = useState<{ [key: number]: boolean }>({});
+  const [likesCount, setLikesCount] = useState<{ [key: number]: number }>({});
 
-  if (isError) {
-    return <div className="text-red-500">Error loading posts. Please try again later.</div>;
-  }
+  useEffect(() => {
+    if (posts.length > 0) {
+      const initialLikesState: { [key: number]: boolean } = {};
+      const initialLikesCount: { [key: number]: number } = {};
+      posts.forEach((post) => {
+        initialLikesState[post.id] = post.has_liked;
+        initialLikesCount[post.id] = post.likes_count;
+      });
+      setLikesState(initialLikesState);
+      setLikesCount(initialLikesCount);
+    }
+  }, [posts]);
+
+  if (isLoading) return <div>Loading posts...</div>;
+  if (isError) return <div className="text-red-500">Error loading posts. Please try again later.</div>;
 
   return (
-    <>
-      {posts.map((post) => {
-        const hasLiked = likesState[post.id] ?? post.has_liked;
-        const currentLikesCount = likesCount[post.id] ?? post.likes_count;
-
-        return (
-          <div
-            className="bg-white rounded-lg shadow p-4 mb-4 cursor-pointer transition-all hover:shadow-md"
-            key={post.id}
-            onClick={() => onSelectPost(post)} // Select post when clicked
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <Avatar>
-                <AvatarImage src={post.userProfileImage} alt={post.nickname} />
-                <AvatarFallback>{post.nickname?.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="font-semibold">{post.nickname}</h3>
-                <p className="text-sm text-gray-500">{post.created_at}</p>
-              </div>
-            </div>
-            <p className="text-gray-600 mb-4">{post.content}</p>
-            <div className="flex items-center gap-6 text-sm text-gray-500">
-              <button
-                className={`flex items-center gap-2 ${hasLiked ? "text-red-500" : "text-gray-500"}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleLike(post.id);
-                }}
-              >
-                <Heart className={`w-5 h-5 ${hasLiked ? "text-red-500" : ""}`} /> {currentLikesCount} Likes
-              </button>
-              <button className="flex items-center gap-2">
-                <MessageCircle className="w-5 h-5" /> {post.comments_count} Comments
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </>
+    <div className="space-y-4">
+      {posts.map((post) => (
+        <PostItem
+          key={post.id}
+          post={post}
+          hasLiked={likesState[post.id]}
+          likesCount={likesCount[post.id]}
+          onLike={() => setLikesState((prev) => ({ ...prev, [post.id]: !prev[post.id] }))}
+          onSelectPost={() => onSelectPost(post)}
+        />
+      ))}
+    </div>
   );
 }

@@ -1,13 +1,18 @@
-import useSWR from 'swr';
-import { fetcher } from '@/lib/hooks/swr/fetcher';
+import useSWR from "swr";
+import { fetcher } from "@/lib/hooks/swr/fetcher";
 
-export function useUserProfile() {
-  const { data, error, isLoading, mutate } = useSWR('http://localhost:8080/userProfile', fetcher);
+export function useUserProfile(user_id?: string) {
+  const shouldFetch = !!user_id; //  Only fetch when `user_id` exists
+
+  const { data, error, isLoading, mutate } = useSWR(
+    shouldFetch ? `http://localhost:8080/users/profile?user_id=${user_id}` : null, //  Corrected API URL
+    fetcher
+  );
 
   return {
-    user: data,
+    user: data, //  User profile data
     isLoading,
     isError: !!error,
-    refreshUser: mutate,
+    refreshUser: mutate, //  Function to manually refresh data
   };
 }
