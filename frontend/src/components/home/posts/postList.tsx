@@ -1,31 +1,16 @@
-import { useState, useEffect } from "react";
-import { usePosts } from "@/lib/hooks/swr/getPosts";
-import PostItem from "@/components/home/posts/postItem";;
+import { useLikes } from "@/lib/hooks/useLikes";
+import PostItem from "@/components/home/posts/postItem";
 
 interface PostsListProps {
   posts: any[];
   isLoading: boolean;
   isError: boolean;
   onSelectPost: (post: any) => void;
+  refreshPosts?: () => void;  // Pass refresh function
 }
 
-
-export default function PostsList({ posts, isLoading, isError, onSelectPost }: PostsListProps) {
-  const [likesState, setLikesState] = useState<{ [key: number]: boolean }>({});
-  const [likesCount, setLikesCount] = useState<{ [key: number]: number }>({});
-
-  useEffect(() => {
-    if (posts.length > 0) {
-      const initialLikesState: { [key: number]: boolean } = {};
-      const initialLikesCount: { [key: number]: number } = {};
-      posts.forEach((post) => {
-        initialLikesState[post.id] = post.has_liked;
-        initialLikesCount[post.id] = post.likes_count;
-      });
-      setLikesState(initialLikesState);
-      setLikesCount(initialLikesCount);
-    }
-  }, [posts]);
+export default function PostsList({ posts, isLoading, isError, onSelectPost, refreshPosts }: PostsListProps) {
+  const { likesState, likesCount, handleLike } = useLikes(posts, refreshPosts);
 
   if (isLoading) return <div>Loading posts...</div>;
   if (isError) return <div className="text-red-500">Error loading posts. Please try again later.</div>;
@@ -36,9 +21,9 @@ export default function PostsList({ posts, isLoading, isError, onSelectPost }: P
         <PostItem
           key={post.id}
           post={post}
-          hasLiked={likesState[post.id]}
-          likesCount={likesCount[post.id]}
-          onLike={() => setLikesState((prev) => ({ ...prev, [post.id]: !prev[post.id] }))}
+          hasLiked={likesState[post.id] ?? false}
+          likesCount={likesCount[post.id] ?? 0}
+          onLike={() => handleLike(post.id)}
           onSelectPost={() => onSelectPost(post)}
         />
       ))}

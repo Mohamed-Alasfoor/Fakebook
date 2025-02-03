@@ -62,7 +62,10 @@ export function PostView({
       const response = await axios.get(
         `http://localhost:8080/posts/comments/all?post_id=${post.id}`
       );
-      
+      if (response.data === null) {
+        setComments([]);
+        return;
+      }
       const loadedComments = response.data.map((c: any) => ({
         id: c.id, // Keep UUID as a string
         user_id: c.user_id,
@@ -179,7 +182,7 @@ export function PostView({
         />
       )}
 
-      {/* Likes / Comments count */}
+      {/* Likes / Comments count
       <div className="flex items-center gap-6 text-sm text-gray-500 mb-4">
         <button
           className={`flex items-center gap-2 ${
@@ -193,7 +196,7 @@ export function PostView({
         <span className="flex items-center gap-2">
           <MessageCircle className="w-5 h-5" /> {comments.length} Comments
         </span>
-      </div>
+      </div> */}
 
       <h3 className="text-lg font-semibold mt-4 mb-2">Comments</h3>
 
