@@ -12,51 +12,51 @@ import (
 
 // RegisterHandler handles user registration
 func RegisterHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != http.MethodPost {
-            http.Error(w, "Invalid request method. Only POST is allowed.", http.StatusMethodNotAllowed)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Invalid request method. Only POST is allowed.", http.StatusMethodNotAllowed)
+			return
+		}
 
-        var user User
-        if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-            http.Error(w, "Invalid request body. Ensure the JSON is correctly formatted.", http.StatusBadRequest)
-            return
-        }
+		var user User
+		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+			http.Error(w, "Invalid request body. Ensure the JSON is correctly formatted.", http.StatusBadRequest)
+			return
+		}
 
-        // Validate the user input
-        if err := ValidateUser(user); err != nil {
-            http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
-            return
-        }
+		// Validate the user input
+		if err := ValidateUser(user); err != nil {
+			http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 
-        // Generate a UUID for the user
-        userID := uuid.New().String()
+		// Generate a UUID for the user
+		userID := uuid.New().String()
 
-        // Hash the password
-        hashedPassword, err := HashPassword(user.Password)
-        if err != nil {
+		// Hash the password
+		hashedPassword, err := HashPassword(user.Password)
+		if err != nil {
 			log.Println("Failed to hash password:", err)
 			http.Error(w, "An internal error occurred while processing your password. Please try again later.", http.StatusInternalServerError)
 			return
 		}
-        user.Password = hashedPassword
+		user.Password = hashedPassword
 
-        // Insert the user into the database
-        _, err = db.Exec(
-            `INSERT INTO users (id, email, password, first_name, last_name, nickname, about_me, avatar, date_of_birth) 
+		// Insert the user into the database
+		_, err = db.Exec(
+			`INSERT INTO users (id, email, password, first_name, last_name, nickname, about_me, avatar, date_of_birth) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            userID, user.Email, user.Password, user.FirstName, user.LastName, user.Nickname, user.AboutMe, user.Avatar, user.DateOfBirth,
-        )
-        if err != nil {
-            log.Println("Failed to register user:", err)
-            http.Error(w, "Failed to register user", http.StatusInternalServerError)
-            return
-        }
+			userID, user.Email, user.Password, user.FirstName, user.LastName, user.Nickname, user.AboutMe, user.Avatar, user.DateOfBirth,
+		)
+		if err != nil {
+			log.Println("Failed to register user:", err)
+			http.Error(w, "Failed to register user", http.StatusInternalServerError)
+			return
+		}
 
-        w.WriteHeader(http.StatusCreated)
-        w.Write([]byte("User registered successfully"))
-    }
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte("User registered successfully"))
+	}
 }
 
 // LoginHandler handles user login
@@ -101,9 +101,9 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			Value:    sessionID,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   true,                      // Ensure secure transport
-			SameSite: http.SameSiteStrictMode,   // Prevent CSRF attacks
-			Expires:  expiresAt,                 // Set expiration time
+			Secure:   true,                    // Ensure secure transport
+			SameSite: http.SameSiteStrictMode, // Prevent CSRF attacks
+			Expires:  expiresAt,               // Set expiration time
 		})
 
 		// Set user_id cookie
@@ -111,21 +111,20 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			Name:     "user_id",
 			Value:    userID,
 			Path:     "/",
-			HttpOnly: true,  // Keep it HttpOnly to prevent XSS attacks
-			Secure:   true,  // Ensure it's only sent over HTTPS
+			HttpOnly: false,
+			Secure:   true, // Ensure it's only sent over HTTPS
 			SameSite: http.SameSiteStrictMode,
 			Expires:  expiresAt,
 		})
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
-			"message":   "Login successful",
+			"message":    "Login successful",
 			"session_id": sessionID,
 			"user_id":    userID, // Optionally return in JSON for frontend convenience
 		})
 	}
 }
-
 
 func LogoutHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -154,8 +153,8 @@ func LogoutHandler(db *sql.DB) http.HandlerFunc {
 			Path:     "/",
 			MaxAge:   -1, // Expire the cookie immediately
 			HttpOnly: true,
-			Secure:   true,                      // Enable Secure flag
-			SameSite: http.SameSiteStrictMode,   // Enforce SameSite: Strict
+			Secure:   true,                    // Enable Secure flag
+			SameSite: http.SameSiteStrictMode, // Enforce SameSite: Strict
 		})
 
 		w.Write([]byte("Logout successful"))
