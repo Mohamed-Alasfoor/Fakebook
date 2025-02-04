@@ -3,8 +3,8 @@ import PostItem from "@/components/home/posts/postItem";
 
 interface PostsListProps {
   posts: any[];
-  isLoading: boolean;
-  isError: boolean;
+  isLoading?: boolean;
+  isError?: boolean;
   onSelectPost: (post: any) => void;
   refreshPosts?: () => void;  // Pass refresh function
 }
