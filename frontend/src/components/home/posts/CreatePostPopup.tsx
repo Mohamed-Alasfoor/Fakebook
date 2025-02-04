@@ -47,47 +47,51 @@ export function CreatePostPopup({
         alert("Content cannot be empty");
         return;
       }
-
-      // Create FormData object for multipart/form-data request
+  
       const formData = new FormData();
-      formData.append("content", content.trim()); // Add text content
-      formData.append("privacy", privacy); // Add privacy setting
+      formData.append("content", content.trim());
+      formData.append("privacy", privacy);
       if (image) {
-        formData.append("file", image); // Add image file if it exists
+        formData.append("file", image);
       }
       if (privacy === "private") {
         selectedUsers.forEach((user) =>
           formData.append("allowed_users[]", user)
         );
       }
-
-      // Send the POST request to the backend
+  
       const response = await fetch("http://localhost:8080/posts", {
         method: "POST",
-        body: formData, // Use FormData directly as the body
-        credentials: "include", // Include cookies in the request
+        body: formData,
+        credentials: "include",
       });
-
+  
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to create post");
       }
-
+  
       const result = await response.json();
-      alert(`Post created successfully! Image URL: ${result.image_url}`); // Show success message
-
-      // Reset the form
+  
+      alert("Post created successfully!");
+  
+      // ✅ Ensure new post is added to the list properly
+      onCreatePost((prevPosts: any[]) => {
+        return Array.isArray(prevPosts) ? [result, ...prevPosts] : [result];
+      });
+  
+      // Reset form
       setContent("");
       setPrivacy("public");
       setSelectedUsers([]);
       setImage(null);
-      onCreatePost(result); // Notify parent component
-      onClose(); // Close the dialog
+      onClose();
     } catch (error) {
       console.error("Error creating post:", error);
       alert("Failed to create post. Please try again.");
     }
   };
+  
 
   // Mock user list for demonstration
   const userList = ["User1", "User2", "User3", "User4", "User5"];

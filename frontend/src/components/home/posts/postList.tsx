@@ -10,10 +10,15 @@ interface PostsListProps {
 }
 
 export default function PostsList({ posts, isLoading, isError, onSelectPost, refreshPosts }: PostsListProps) {
-  const { likesState, likesCount, handleLike } = useLikes(posts, refreshPosts);
+  const { likesState, likesCount, handleLike } = useLikes(posts || [], refreshPosts); // Ensure `posts` is always an array
 
   if (isLoading) return <div>Loading posts...</div>;
   if (isError) return <div className="text-red-500">Error loading posts. Please try again later.</div>;
+
+  if (!Array.isArray(posts)) {
+    console.error("Error: posts is not an array", posts);
+    return <div className="text-red-500">Something went wrong. Please try again.</div>;
+  }
 
   return (
     <div className="space-y-4">
