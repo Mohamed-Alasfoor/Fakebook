@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-  "path/filepath"
+	"path/filepath"
 	"social-network/pkg/notifications"
 	"social-network/pkg/sessions"
 	"strings"
@@ -173,7 +173,7 @@ func DeleteCommentHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// GetCommentsByPostHandler fetches all comments for a post
+// GetCommentsByPostHandler fetches all comments for a post along with the user's nickname and avatar
 func GetCommentsByPostHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -187,11 +187,13 @@ func GetCommentsByPostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Query to fetch comments along with user's nickname and avatar
 		rows, err := db.Query(`
-			SELECT id, post_id, user_id, content, image_url, created_at
-			FROM comments
-			WHERE post_id = ?
-			ORDER BY created_at ASC
+			SELECT c.id, c.post_id, c.user_id, u.nickname, u.avatar, c.content, c.image_url, c.created_at
+			FROM comments c
+			JOIN users u ON c.user_id = u.id
+			WHERE c.post_id = ?
+			ORDER BY c.created_at ASC
 		`, postID)
 		if err != nil {
 			http.Error(w, "Failed to fetch comments", http.StatusInternalServerError)
@@ -199,10 +201,22 @@ func GetCommentsByPostHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var comments []Comment
+		// Struct to hold comment data including nickname and avatar
+		type CommentResponse struct {
+			ID        string `json:"id"`
+			PostID    string `json:"post_id"`
+			UserID    string `json:"user_id"`
+			Nickname  string `json:"nickname"`
+			Avatar    string `json:"avatar"`
+			Content   string `json:"content"`
+			ImageURL  string `json:"image_url,omitempty"`
+			CreatedAt string `json:"created_at"`
+		}
+
+		var comments []CommentResponse
 		for rows.Next() {
-			var comment Comment
-			if err := rows.Scan(&comment.ID, &comment.PostID, &comment.UserID, &comment.Content, &comment.ImageURL, &comment.CreatedAt); err != nil {
+			var comment CommentResponse
+			if err := rows.Scan(&comment.ID, &comment.PostID, &comment.UserID, &comment.Nickname, &comment.Avatar, &comment.Content, &comment.ImageURL, &comment.CreatedAt); err != nil {
 				http.Error(w, "Failed to parse comments", http.StatusInternalServerError)
 				return
 			}
@@ -213,6 +227,7 @@ func GetCommentsByPostHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(comments)
 	}
 }
+
 
 // Helper function to check allowed file extensions
 func contains(slice []string, item string) bool {
