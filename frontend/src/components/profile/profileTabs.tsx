@@ -18,7 +18,7 @@ export default function ProfileTabs({ user }: any) {
       </TabsList>
 
       <TabsContent value="posts">
-        {user.posts.length > 0 ? (
+        {user.posts !==null ? (
           selectedPost ? (
             <PostView
               post={selectedPost}
@@ -38,7 +38,7 @@ export default function ProfileTabs({ user }: any) {
       </TabsContent>
 
       <TabsContent value="followers">
-        {user.followers.length > 0 ? (
+        {user.followers !==null? (
           user.followers
             .filter(
               (follower: any, index: number, self: any[]) =>
@@ -56,7 +56,7 @@ export default function ProfileTabs({ user }: any) {
       </TabsContent>
 
       <TabsContent value="following">
-        {user.following && user.following.length > 0 ? (
+        {user.following && user.following !==null ? (
           user.following
             .filter(
               (following: any, index: number, self: any[]) =>
