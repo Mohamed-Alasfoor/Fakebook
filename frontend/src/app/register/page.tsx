@@ -7,7 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { PasswordInput } from "@/components/auth/password";
 import { LoginButtons } from "@/components/auth/login-buttons";
@@ -40,35 +46,35 @@ export default function RegisterPage() {
   // Handle form submission
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-  
+
     try {
-      // Construct the JSON payload
-      const payload = {
-        email,
-        password,
-        first_name: firstName,
-        last_name: lastName,
-        nickname,
-        about_me: about,
-        avatar: avatarPreview || "", // Use the avatar preview URL (or set it to empty)
-        date_of_birth: dateOfBirth,
-      };
-  
-      // Send the POST request with JSON payload
-      const res = await axios.post("http://localhost:8080/register", payload, {
+      const formData = new FormData();
+      formData.append("email", email);
+      formData.append("password", password);
+      formData.append("first_name", firstName);
+      formData.append("last_name", lastName);
+      formData.append("nickname", nickname);
+      formData.append("about_me", about);
+      formData.append("date_of_birth", dateOfBirth);
+
+      if (avatar) {
+        formData.append("avatar", avatar); // Append actual file
+      }
+
+      const res = await axios.post("http://localhost:8080/register", formData, {
         headers: {
-          "Content-Type": "application/json", // Specify JSON content type
+          "Content-Type": "multipart/form-data",
         },
       });
-  
-      // Handle success
+
       alert(res.data.message || "Account created successfully!");
     } catch (err: any) {
       console.error(err);
-      alert(err.response?.data?.message || "An error occurred during registration.");
+      alert(
+        err.response?.data?.message || "An error occurred during registration."
+      );
     }
   };
-  
 
   return (
     <AuthLayout
@@ -77,7 +83,9 @@ export default function RegisterPage() {
     >
       <Card className="border-gray-200 text-[#6C5CE7]">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-xl text-[#6C5CE7]">Personal Information</CardTitle>
+          <CardTitle className="text-xl text-[#6C5CE7]">
+            Personal Information
+          </CardTitle>
           <CardDescription className="text-[#6C5CE7]/70">
             Fill in your details to create your account
           </CardDescription>

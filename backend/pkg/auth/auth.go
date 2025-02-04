@@ -3,8 +3,12 @@ package auth
 import (
 	"database/sql"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,10 +22,22 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		var user User
-		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-			http.Error(w, "Invalid request body. Ensure the JSON is correctly formatted.", http.StatusBadRequest)
+		// Parse multipart form with max 10 MB upload size
+		const maxUploadSize = 10 << 20 // 10 MB
+		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
 			return
+		}
+
+		// Extract JSON fields
+		user := User{
+			Email:      r.FormValue("email"),
+			Password:   r.FormValue("password"),
+			FirstName:  r.FormValue("first_name"),
+			LastName:   r.FormValue("last_name"),
+			Nickname:   r.FormValue("nickname"),
+			AboutMe:    r.FormValue("about_me"),
+			DateOfBirth: r.FormValue("date_of_birth"),
 		}
 
 		// Validate the user input
@@ -42,11 +58,58 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
 		}
 		user.Password = hashedPassword
 
+		// Handle avatar upload
+		avatarFile, avatarHeader, err := r.FormFile("avatar")
+		var avatarFilename string
+		if err == nil { // File exists
+			defer avatarFile.Close()
+
+			// Validate the file type
+			allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif"}
+			fileExt := strings.ToLower(filepath.Ext(avatarHeader.Filename))
+			if !contains(allowedExtensions, fileExt) {
+				http.Error(w, "Invalid avatar file type. Allowed: .jpg, .jpeg, .png, .gif", http.StatusBadRequest)
+				return
+			}
+
+			// Ensure the "avatars" directory exists
+			avatarDir := "avatars"
+			if _, err := os.Stat(avatarDir); os.IsNotExist(err) {
+				err = os.MkdirAll(avatarDir, 0755)
+				if err != nil {
+					log.Printf("Failed to create avatars directory: %v", err)
+					http.Error(w, "Failed to create avatar directory", http.StatusInternalServerError)
+					return
+				}
+			}
+
+			// Generate a unique filename and save the avatar
+			avatarFilename = uuid.New().String() + fileExt
+			avatarPath := filepath.Join(avatarDir, avatarFilename)
+
+			outFile, err := os.Create(avatarPath)
+			if err != nil {
+				log.Printf("Failed to create avatar file: %v", err)
+				http.Error(w, "Failed to save avatar", http.StatusInternalServerError)
+				return
+			}
+			defer outFile.Close()
+
+			if _, err := io.Copy(outFile, avatarFile); err != nil {
+				log.Printf("Failed to copy avatar file: %v", err)
+				http.Error(w, "Failed to save avatar", http.StatusInternalServerError)
+				return
+			}
+		} else if err != http.ErrMissingFile {
+			http.Error(w, "Failed to upload avatar: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		// Insert the user into the database
 		_, err = db.Exec(
 			`INSERT INTO users (id, email, password, first_name, last_name, nickname, about_me, avatar, date_of_birth) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			userID, user.Email, user.Password, user.FirstName, user.LastName, user.Nickname, user.AboutMe, user.Avatar, user.DateOfBirth,
+			userID, user.Email, user.Password, user.FirstName, user.LastName, user.Nickname, user.AboutMe, avatarFilename, user.DateOfBirth,
 		)
 		if err != nil {
 			log.Println("Failed to register user:", err)
@@ -55,9 +118,24 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("User registered successfully"))
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "User registered successfully",
+			"user_id": userID,
+			"avatar":  avatarFilename, // Return the avatar filename for frontend use
+		})
 	}
 }
+
+// Helper function to check if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 
 // LoginHandler handles user login
 func LoginHandler(db *sql.DB) http.HandlerFunc {
