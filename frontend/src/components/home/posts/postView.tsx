@@ -110,6 +110,10 @@ export function PostView({
       const formData = new FormData();
       formData.append("post_id", String(post.id));
       formData.append("content", newComment);
+      if (newComment.trim() === ""){
+        setError("Comment cannot be empty.");
+        return;
+      }
       if (selectedFile) {
         formData.append("file", selectedFile);
       }
