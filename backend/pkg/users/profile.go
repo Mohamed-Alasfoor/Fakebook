@@ -55,6 +55,14 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Check if the logged-in user is viewing their own profile
+		isMyProfile := loggedInUserID == profileID
+
+		// Check if the logged-in user is following the profile owner
+		var isFollowing bool
+		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = ? AND status = 'accepted')`,
+			loggedInUserID, profileID).Scan(&isFollowing)
+
 		// Fetch profile data
 		var profile UserProfile
 		err = db.QueryRow(`
@@ -77,38 +85,36 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 		db.QueryRow(`SELECT COUNT(*) FROM followers WHERE follower_id = ? AND status = 'accepted'`, profileID).Scan(&profile.FollowingCount)
 
 		// If the profile is private and the requester is NOT the owner or a follower, return limited info
-		if profile.Private && profileID != loggedInUserID {
-			var isFollower bool
-			db.QueryRow(`SELECT EXISTS(SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = ? AND status = 'accepted')`,
-				loggedInUserID, profileID).Scan(&isFollower)
-
-			if !isFollower {
-				// Only return limited information
-				response := struct {
-					ID        string `json:"id"`
-					Nickname  string `json:"nickname"`
-					Avatar    string `json:"avatar,omitempty"`
-					Private   bool   `json:"private"`
-					Followers int    `json:"followers_count"`
-					Following int    `json:"following_count"`
-					Message   string `json:"message"`
-				}{
-					ID:        profile.ID,
-					Nickname:  profile.Nickname,
-					Avatar:    profile.Avatar,
-					Private:   profile.Private,
-					Followers: profile.FollowersCount,
-					Following: profile.FollowingCount,
-					Message:   "This profile is private. You must follow to see more details.",
-				}
-
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
-				return
+		if profile.Private && !isMyProfile && !isFollowing {
+			// Return limited data
+			response := struct {
+				ID          string `json:"id"`
+				Nickname    string `json:"nickname"`
+				Avatar      string `json:"avatar,omitempty"`
+				Private     bool   `json:"private"`
+				Followers   int    `json:"followers_count"`
+				Following   int    `json:"following_count"`
+				IsFollowing bool   `json:"is_following"`
+				IsMyProfile bool   `json:"is_my_profile"`
+				Message     string `json:"message"`
+			}{
+				ID:          profile.ID,
+				Nickname:    profile.Nickname,
+				Avatar:      profile.Avatar,
+				Private:     profile.Private,
+				Followers:   profile.FollowersCount,
+				Following:   profile.FollowingCount,
+				IsFollowing: isFollowing,
+				IsMyProfile: isMyProfile,
+				Message:     "This profile is private. You must follow to see more details.",
 			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+			return
 		}
 
-		// Fetch followers details (nickname, avatar)
+		// Fetch followers details
 		rows, err := db.Query(`
 			SELECT users.id, users.nickname, users.avatar 
 			FROM followers 
@@ -124,7 +130,7 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Fetch following details (nickname, avatar)
+		// Fetch following details
 		rows, err = db.Query(`
 			SELECT users.id, users.nickname, users.avatar 
 			FROM followers 
@@ -140,12 +146,11 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Fetch user posts (same as before)
+		// Fetch user posts
 		var query string
 		var postRows *sql.Rows
 
-		if profile.Private && profileID != loggedInUserID {
-			// Fetch posts only if the logged-in user follows the profile
+		if profile.Private && !isMyProfile {
 			query = `
 				SELECT id, user_id, content, image_url, privacy, likes_count, comments_count, created_at, 
 					(SELECT nickname FROM users WHERE id = user_id) AS nickname, 
@@ -161,7 +166,6 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 				ORDER BY created_at DESC`
 			postRows, err = db.Query(query, loggedInUserID, profileID, loggedInUserID, profileID)
 		} else {
-			// Fetch all posts for public profiles or the user's own profile
 			query = `
 				SELECT id, user_id, content, image_url, privacy, likes_count, comments_count, created_at, 
 					(SELECT nickname FROM users WHERE id = user_id) AS nickname, 
@@ -191,10 +195,23 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 			profile.Posts = append(profile.Posts, post)
 		}
 
+		// ✅ **Include isFollowing and isMyProfile in all responses**
+		response := struct {
+			UserProfile
+			IsFollowing bool `json:"is_following"`
+			IsMyProfile bool `json:"is_my_profile"`
+		}{
+			UserProfile: profile,
+			IsFollowing: isFollowing,
+			IsMyProfile: isMyProfile,
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(profile)
+		json.NewEncoder(w).Encode(response)
 	}
 }
+
+
 
 // TogglePrivacyHandler allows a user to toggle their profile visibility
 func TogglePrivacyHandler(db *sql.DB) http.HandlerFunc {
