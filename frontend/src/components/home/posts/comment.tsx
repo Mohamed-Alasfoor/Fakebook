@@ -11,13 +11,14 @@ interface CommentItemProps {
   content: string;
   created_at: string;
   image_url?: string;
+  avatar? : string;
 }
 
 export function CommentItem({ comment }: CommentItemProps) {
   return (
     <div className="flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg shadow-sm w-full">
       <Avatar className="w-12 h-12 flex-shrink-0">
-        <AvatarImage src={comment.userProfileImage} alt={comment.nickname} />
+        <AvatarImage  src={`localhost:8080/uploads/${comment.avatar}`} alt={comment.nickname} />
         <AvatarFallback>{comment.nickname?.charAt(0)}</AvatarFallback>
       </Avatar>
       <div className="flex flex-col bg-gray-100 px-4 py-3 rounded-xl w-full">
