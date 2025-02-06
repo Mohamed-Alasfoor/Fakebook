@@ -18,7 +18,7 @@ export function useGroups() {
 
   const fetchGroups = useCallback(async () => {
     try {
-      const response = await axios.get("http://localhost:8080/groups",{withCredentials: true});
+      const response = await axios.get("http://localhost:8080/groups", { withCredentials: true });
       setGroups(response.data);
     } catch (error) {
       console.error("Error fetching groups:", error);
@@ -27,7 +27,7 @@ export function useGroups() {
 
   const fetchJoinedGroups = useCallback(async () => {
     try {
-      const response = await axios.get("http://localhost:8080/groups/user",{withCredentials: true});
+      const response = await axios.get("http://localhost:8080/groups/user", { withCredentials: true });
       setJoinedGroups(response.data);
     } catch (error) {
       console.error("Error fetching joined groups:", error);
@@ -37,7 +37,9 @@ export function useGroups() {
   const searchGroups = useCallback(async (query: string) => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`http://localhost:8080/groups/search?query=${encodeURIComponent(query)}`,{withCredentials: true});
+      const response = await axios.get(`http://localhost:8080/groups/search?query=${encodeURIComponent(query)}`, {
+        withCredentials: true,
+      });
       setGroups(response.data);
     } catch (error) {
       console.error("Error searching groups:", error);
