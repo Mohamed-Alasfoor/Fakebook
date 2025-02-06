@@ -8,6 +8,7 @@ import (
 	"net/http"
   "social-network/pkg/sessions"
 	"github.com/google/uuid"
+	"social-network/pkg/notifications"
 )
 
 // FollowHandler handles follow requests
@@ -86,19 +87,27 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Handle private vs public profile
-		if isPrivate {
-			log.Printf("User %s has a private profile. Creating follow request...", request.FollowedID)
-			_, err := db.Exec(`
-				INSERT INTO followers (id, follower_id, followed_id, status, request_type)
-				VALUES (?, ?, ?, 'pending', 'manual')
-			`, uuid.New().String(), userID, request.FollowedID)
-			if err != nil {
-				log.Printf("Error inserting follow request: %v", err)
-				http.Error(w, "Failed to send follow request", http.StatusInternalServerError)
-				return
-			}
-			w.Write([]byte("Follow request sent"))
+// Handle private vs public profile
+  if isPrivate {
+	  log.Printf("User %s has a private profile. Creating follow request...", request.FollowedID)
+	  _, err := db.Exec(`
+	   	INSERT INTO followers (id, follower_id, followed_id, status, request_type)
+	  	VALUES (?, ?, ?, 'pending', 'manual')
+	  `, uuid.New().String(), userID, request.FollowedID)
+	  if err != nil {
+		  log.Printf("Error inserting follow request: %v", err)
+		  http.Error(w, "Failed to send follow request", http.StatusInternalServerError)
+		  return
+	  }
+
+  	// Send notification to the private user
+  	err = notifications.CreateNotification(db, request.FollowedID, "follow_request",
+	  	fmt.Sprintf("User %s has requested to follow you.", userID), "", userID, "", "")
+	   if err != nil {
+	    	log.Println("Failed to create notification:", err)
+	    }
+
+	     w.Write([]byte("Follow request sent"))
 		} else {
 			log.Printf("User %s has a public profile. Following directly...", request.FollowedID)
 			_, err := db.Exec(`

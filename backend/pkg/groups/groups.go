@@ -118,17 +118,42 @@ func CreateGroupHandler(db *sql.DB) http.HandlerFunc {
 		group.ID = uuid.New().String()
 		group.CreatorID = userID // Corrected field name
 
-		_, err = db.Exec(`INSERT INTO groups (id, name, description, creator_id) VALUES (?, ?, ?, ?)`,
-			group.ID, group.Name, group.Description, group.CreatorID)
-		if err != nil {
-			http.Error(w, "Failed to create group", http.StatusInternalServerError)
-			return
+		        // Start a transaction
+						tx, err := db.Begin()
+						if err != nil {
+								http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
+								return
+						}
+		
+						// Insert group into the database
+						_, err = tx.Exec(`INSERT INTO groups (id, name, description, creator_id) VALUES (?, ?, ?, ?)`,
+								group.ID, group.Name, group.Description, group.CreatorID)
+						if err != nil {
+								tx.Rollback()
+								http.Error(w, "Failed to create group", http.StatusInternalServerError)
+								return
+						}
+		
+						// Insert creator into group_membership as 'member'
+						_, err = tx.Exec(`INSERT INTO group_membership (id, group_id, user_id, status) VALUES (?, ?, ?, 'member')`,
+								uuid.New().String(), group.ID, group.CreatorID)
+						if err != nil {
+								tx.Rollback()
+								http.Error(w, "Failed to add creator to group membership", http.StatusInternalServerError)
+								return
+						}
+		
+						// Commit transaction
+						if err := tx.Commit(); err != nil {
+								http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
+								return
+						}
+		
+						// Return success response
+						w.WriteHeader(http.StatusCreated)
+						json.NewEncoder(w).Encode(map[string]string{"message": "Group created successfully", "group_id": group.ID})
+				}
 		}
-
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Group created successfully", "group_id": group.ID})
-	}
-}
 
 // RequestToJoinHandler - Allows users to request to join a group
 func RequestToJoinHandler(db *sql.DB) http.HandlerFunc {
@@ -153,8 +178,33 @@ func RequestToJoinHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err = db.Exec(`INSERT INTO group_membership (id, group_id, user_id, status) VALUES (?, ?, ?, 'pending_request')`,
-			uuid.New().String(), request.GroupID, userID)
+		// Check if the user already has a join request, invitation, or is a member
+		var existingStatus string
+		err = db.QueryRow(`
+			SELECT status FROM group_membership WHERE group_id = ? AND user_id = ?
+		`, request.GroupID, userID).Scan(&existingStatus)
+
+		if err == nil {
+			if existingStatus == "pending_request" {
+				http.Error(w, "You have already requested to join this group", http.StatusConflict)
+				return
+			} else if existingStatus == "pending_invite" {
+				http.Error(w, "You have already been invited to this group. Accept or decline the invitation first.", http.StatusConflict)
+				return
+			} else if existingStatus == "member" {
+				http.Error(w, "You are already a member of this group", http.StatusConflict)
+				return
+			}
+		} else if err != sql.ErrNoRows {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
+		// Insert new join request
+		_, err = db.Exec(`
+			INSERT INTO group_membership (id, group_id, user_id, status) 
+			VALUES (?, ?, ?, 'pending_request')`, uuid.New().String(), request.GroupID, userID)
+
 		if err != nil {
 			http.Error(w, "Failed to send join request", http.StatusInternalServerError)
 			return
@@ -168,9 +218,10 @@ func RequestToJoinHandler(db *sql.DB) http.HandlerFunc {
 				"A user has requested to join your group", "", userID, request.GroupID, "")
 		}
 
-		w.Write([]byte("Join request sent"))
+		w.Write([]byte("Join request sent successfully"))
 	}
 }
+
 
 // HandleJoinRequestHandler - Allows group creator to accept or decline join requests
 func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
@@ -278,6 +329,28 @@ func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
 					http.Error(w, "Unauthorized: Only group members can send invites", http.StatusForbidden)
 					return
 			}
+
+				// Check if the user is already in the group or has a pending request
+		var existingStatus string
+		err = db.QueryRow(`
+			SELECT status FROM group_membership WHERE group_id = ? AND user_id = ?
+		`, invite.GroupID, invite.UserID).Scan(&existingStatus)
+
+		if err == nil {
+			if existingStatus == "pending_invite" {
+				http.Error(w, "This user has already been invited", http.StatusConflict)
+				return
+			} else if existingStatus == "pending_request" {
+				http.Error(w, "This user has already requested to join. Accept or decline the request first.", http.StatusConflict)
+				return
+			} else if existingStatus == "member" {
+				http.Error(w, "This user is already a member", http.StatusConflict)
+				return
+			}
+		} else if err != sql.ErrNoRows {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
 
 			// Insert invitation with pending status
 			_, err = db.Exec(`
