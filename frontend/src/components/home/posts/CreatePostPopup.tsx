@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { X, Image, User, Globe, Lock, Users } from "lucide-react";
+import axios from "axios";
 
 interface CreatePostPopupProps {
   isOpen: boolean;
@@ -40,6 +41,15 @@ export function CreatePostPopup({
       setImage(e.target.files[0]);
     }
   };
+  const getFollowers = async ()=>{
+    try{
+      const response = axios.get("http://localhost:8080/followers",{withCredentials:true})
+      console.log((await response).data)
+    }catch(error){
+      console.error("Error fetching followers:", error);
+    }
+  }
+
 
   const handleSubmit = async () => {
     try {
@@ -75,7 +85,7 @@ export function CreatePostPopup({
   
       alert("Post created successfully!");
   
-      // ✅ Ensure new post is added to the list properly
+      //  Ensure new post is added to the list properly
       onCreatePost((prevPosts: any[]) => {
         return Array.isArray(prevPosts) ? [result, ...prevPosts] : [result];
       });

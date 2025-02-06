@@ -22,9 +22,9 @@ export default function PostsList({ posts, isLoading, isError, onSelectPost, ref
 
   return (
     <div className="space-y-4">
-      {posts.map((post) => (
+      {posts.map((post,index) => (
         <PostItem
-          key={post.id}
+          key={post.id || index}
           post={post}
           hasLiked={likesState[post.id] ?? false}
           likesCount={likesCount[post.id] ?? 0}

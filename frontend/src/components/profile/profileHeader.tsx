@@ -1,6 +1,7 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import axios from "axios";
 import { CalendarIcon, UserIcon, UsersIcon, LockIcon } from "lucide-react";
 
 interface ProfileHeaderProps {
@@ -11,6 +12,41 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  };
+
+  const followUser = async (followedId: string) => {
+    try {
+      const response = await axios.post(
+        "http://localhost:8080/follow", // Adjust the endpoint as needed
+        { followed_id: followedId },
+        {
+          withCredentials: true, // Include cookies for session-based auth
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+  
+      alert("Follow Response: "+ response.data);
+    } catch (error) {
+      alert("Error following user");
+    }
+  };
+  const unfollowUser = async (followedId: string) => {
+    try {
+      const response = await axios.delete("http://localhost:8080/unfollow", {
+        data: { followed_id: followedId }, // Send data in the request body
+        withCredentials: true, // Include cookies for session-based auth
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+  
+      console.log("Unfollow Response:", response.data);
+      alert(response.data); // Show success message
+    } catch (error) {
+      alert("Error unfollowing user");
+    }
   };
 
   return (
@@ -46,7 +82,7 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
               )}
             </div>
           </div>
-          <Button className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white">
+          <Button className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white" onClick={() => followUser(user.id)}>
             {user.private ? "Request to Follow" : "Follow"}
           </Button>
         </div>
