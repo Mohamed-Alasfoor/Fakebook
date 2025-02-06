@@ -106,6 +106,11 @@ func main() {
   mux.HandleFunc("/groups/events/rsvps", events.GetRSVPsForEventHandler(db))    // Fetch RSVPs for an event
   mux.HandleFunc("/groups/events/rsvp/remove", events.RemoveRSVPHandler(db))    // Remove RSVP
 
+	// Group Chat WebSocket
+mux.HandleFunc("/groups/chat", groups.GroupChatHandler(db))
+mux.HandleFunc("/groups/chat/messages", groups.GetGroupChatMessagesHandler(db))  // Fetch previous messages API
+
+
 
 	// Protected Routes (require authentication)
 	mux.Handle("/protected-resource", auth.AuthMiddleware(db, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
