@@ -10,16 +10,17 @@ import {
   Avatar,
   Box,
   Grid,
-  Paper,
   List,
   ListItem,
   ListItemAvatar,
   ListItemButton,
   ListItemText,
   TextField,
-  Divider,
   Button,
   styled,
+  Menu,
+  MenuItem,
+  Badge,
 } from "@mui/material";
 
 import {
@@ -33,6 +34,7 @@ import {
   Group as GroupIcon,
   Chat as ChatIcon,
   PersonAdd as PersonAddIcon,
+  Notifications as NotificationsIcon,
 } from "@mui/icons-material";
 
 /** Emoji picker library */
@@ -114,7 +116,29 @@ export default function ChatOnnExactPage() {
     { text: "Sounds perfect", outgoing: true },
   ]);
 
-  // Right sidebar suggestions data (notifications removed)
+  // Notifications data (used for the top dropdown)
+  const [notifications] = useState([
+    { text: "@Ankita mentioned you in 'Trip to Goa' - 1m ago" },
+    { text: "@rakeshSingh added you in group 'Study' - 5m ago" },
+    { text: "@nituRah removed you from group 'Riders' - 8m ago" },
+    { text: "@amit mentioned you in 'Public chat' - 12m ago" },
+    { text: "@Ankita mentioned you in 'College Gang' - 15m ago" },
+    { text: "@VikashSingh added you in group 'Designers' - 20m ago" },
+  ]);
+
+  // For controlling the notifications dropdown
+  const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<null | HTMLElement>(null);
+  const openNotifications = Boolean(notificationsAnchorEl);
+
+  const handleNotificationsClick = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationsAnchorEl(event.currentTarget);
+  };
+
+  const handleNotificationsClose = () => {
+    setNotificationsAnchorEl(null);
+  };
+
+  // Right sidebar suggestions data
   const [suggestions] = useState([
     { name: "Abhinam Singh", mutual: "12 Mutuals", avatar: "https://i.pravatar.cc/30?img=6" },
     { name: "Ved Prakash", mutual: "5 Mutuals", avatar: "https://i.pravatar.cc/30?img=7" },
@@ -154,7 +178,10 @@ export default function ChatOnnExactPage() {
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setMessages((prev) => [...prev, { text: `File uploaded: ${file.name}`, outgoing: true }]);
+      setMessages((prev) => [
+        ...prev,
+        { text: `File uploaded: ${file.name}`, outgoing: true },
+      ]);
       e.target.value = "";
     }
   };
@@ -166,7 +193,10 @@ export default function ChatOnnExactPage() {
   const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const imgFile = e.target.files?.[0];
     if (imgFile) {
-      setMessages((prev) => [...prev, { text: `Image uploaded: ${imgFile.name}`, outgoing: true }]);
+      setMessages((prev) => [
+        ...prev,
+        { text: `Image uploaded: ${imgFile.name}`, outgoing: true },
+      ]);
       e.target.value = "";
     }
   };
@@ -196,12 +226,38 @@ export default function ChatOnnExactPage() {
             <IconButton>
               <GroupIcon sx={{ color: "#9b51e0" }} />
             </IconButton>
+            <IconButton onClick={handleNotificationsClick}>
+              <Badge badgeContent={notifications.length} color="error">
+                <NotificationsIcon sx={{ color: "#9b51e0" }} />
+              </Badge>
+            </IconButton>
             <IconButton>
               <Avatar src="https://i.pravatar.cc/40?img=10" />
             </IconButton>
           </Box>
         </Toolbar>
       </AppBar>
+
+      {/* Notifications Dropdown Menu */}
+      <Menu
+        anchorEl={notificationsAnchorEl}
+        open={openNotifications}
+        onClose={handleNotificationsClose}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "right",
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "right",
+        }}
+      >
+        {notifications.map((n, idx) => (
+          <MenuItem key={idx} onClick={handleNotificationsClose}>
+            {n.text}
+          </MenuItem>
+        ))}
+      </Menu>
 
       <Grid container sx={{ height: "calc(100vh - 64px)" }}>
         {/* LEFT SIDEBAR */}
@@ -314,7 +370,16 @@ export default function ChatOnnExactPage() {
         </Grid>
 
         {/* CENTER CHAT AREA */}
-        <Grid item xs={6} sx={{ backgroundColor: "#fff", display: "flex", flexDirection: "column", position: "relative" }}>
+        <Grid
+          item
+          xs={6}
+          sx={{
+            backgroundColor: "#fff",
+            display: "flex",
+            flexDirection: "column",
+            position: "relative",
+          }}
+        >
           {/* Chat Header */}
           <Box
             sx={{
@@ -345,7 +410,16 @@ export default function ChatOnnExactPage() {
           </Box>
 
           {/* Messages area */}
-          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", p: 2, overflowY: "auto", gap: 1 }}>
+          <Box
+            sx={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              p: 2,
+              overflowY: "auto",
+              gap: 1,
+            }}
+          >
             <Typography variant="caption" sx={{ color: "#999", alignSelf: "center", mb: 2 }}>
               Today 12:21 AM
             </Typography>
