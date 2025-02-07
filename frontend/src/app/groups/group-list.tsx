@@ -41,7 +41,7 @@ export function GroupList({ groups, type, isLoading, refreshGroups, requestToJoi
     );
   }
 
-  if (!groups.length) {
+  if (groups===null) {
     return (
       <Card className="border-2 border-slate-100">
         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
