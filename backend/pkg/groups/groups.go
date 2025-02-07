@@ -22,11 +22,18 @@ type Group struct {
 	CreatedAt   string `json:"created_at"`
 }
 
-// GetAllGroupsHandler - Fetches all existing groups for browsing
+// GetAllGroupsHandler - Fetches all existing groups for browsing and includes user status
 func GetAllGroupsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Get logged-in user ID
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
@@ -41,12 +48,35 @@ func GetAllGroupsHandler(db *sql.DB) http.HandlerFunc {
 		defer rows.Close()
 
 		// Store the result in a slice
-		var groups []Group
+		var groups []map[string]interface{}
 		for rows.Next() {
-			var group Group
-			if err := rows.Scan(&group.ID, &group.Name, &group.Description, &group.CreatorID, &group.CreatedAt); err != nil {
+			var groupID, name, description, creatorID, createdAt string
+			if err := rows.Scan(&groupID, &name, &description, &creatorID, &createdAt); err != nil {
 				http.Error(w, "Failed to parse groups", http.StatusInternalServerError)
 				return
+			}
+
+			// Check user's relationship with this group
+			var userStatus string
+			err = db.QueryRow(`
+				SELECT status FROM group_membership WHERE group_id = ? AND user_id = ?
+			`, groupID, userID).Scan(&userStatus)
+
+			if err == sql.ErrNoRows {
+				userStatus = "not_joined" // No record found, user is not part of the group
+			} else if err != nil {
+				http.Error(w, "Database error", http.StatusInternalServerError)
+				return
+			}
+
+			// Append group with user status to the response
+			group := map[string]interface{}{
+				"id":           groupID,
+				"name":         name,
+				"description":  description,
+				"creator_id":   creatorID,
+				"created_at":   createdAt,
+				"user_status":  userStatus, // Status like "member", "pending_request", etc.
 			}
 			groups = append(groups, group)
 		}
@@ -56,6 +86,7 @@ func GetAllGroupsHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(groups)
 	}
 }
+
 
 //Allows users to search for groups by name
 func SearchGroupsHandler(db *sql.DB) http.HandlerFunc {
