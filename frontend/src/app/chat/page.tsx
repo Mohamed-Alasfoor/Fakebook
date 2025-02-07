@@ -23,7 +23,6 @@ import {
 } from "@mui/material";
 
 import {
-  // We remove VideocamIcon & CallIcon so they won't appear in the header
   Search as SearchIcon,
   MoreVert as MoreVertIcon,
   Send as SendIcon,
@@ -31,7 +30,6 @@ import {
   InsertEmoticon as InsertEmoticonIcon,
   AttachFile as AttachFileIcon,
   Image as ImageIcon,
-  Notifications as NotificationsIcon,
   Group as GroupIcon,
   Chat as ChatIcon,
   PersonAdd as PersonAddIcon,
@@ -110,21 +108,13 @@ export default function ChatOnnExactPage() {
     },
     { text: "I will share something", outgoing: false },
     {
-      text: "Let's together work on this n create something more awesome.",
+      text: "Let's together work on this and create something more awesome.",
       outgoing: false,
     },
     { text: "Sounds perfect", outgoing: true },
   ]);
 
-  // Right sidebar data
-  const [notifications] = useState([
-    { text: "@Ankita mentioned you in 'Trip to Goa' - 1m ago" },
-    { text: "@rakeshSingh added you in group 'Study' - 5m ago" },
-    { text: "@nituRah removed you from group 'Riders' - 8m ago" },
-    { text: "@amit mentioned you in 'Public chat' - 12m ago" },
-    { text: "@Ankita mentioned you in 'College Gang' - 15m ago" },
-    { text: "@VikashSingh added you in group 'Designers' - 20m ago" },
-  ]);
+  // Right sidebar suggestions data (notifications removed)
   const [suggestions] = useState([
     { name: "Abhinam Singh", mutual: "12 Mutuals", avatar: "https://i.pravatar.cc/30?img=6" },
     { name: "Ved Prakash", mutual: "5 Mutuals", avatar: "https://i.pravatar.cc/30?img=7" },
@@ -183,7 +173,7 @@ export default function ChatOnnExactPage() {
 
   return (
     <Box sx={{ height: "100vh", width: "100vw", backgroundColor: "#f9f9f9", overflow: "hidden" }}>
-      {/* Top navbar (AppBar) with "Chat ONN" brand + icons */}
+      {/* Top navbar (AppBar) with "Social Chat" brand + icons */}
       <AppBar
         position="static"
         sx={{
@@ -195,21 +185,16 @@ export default function ChatOnnExactPage() {
         }}
       >
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-          {/* Left: Brand Name */}
           <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-            Social Chat 
+            Social Chat
           </Typography>
 
-          {/* Middle icons (unchanged) */}
           <Box sx={{ display: "flex", gap: 3 }}>
             <IconButton>
               <ChatIcon sx={{ color: "#9b51e0" }} />
             </IconButton>
             <IconButton>
               <GroupIcon sx={{ color: "#9b51e0" }} />
-            </IconButton>
-            <IconButton>
-              <NotificationsIcon sx={{ color: "#9b51e0" }} />
             </IconButton>
             <IconButton>
               <Avatar src="https://i.pravatar.cc/40?img=10" />
@@ -252,7 +237,7 @@ export default function ChatOnnExactPage() {
               </IconButton>
             </Box>
 
-            {/* Search input: now updates searchTerm */}
+            {/* Search input */}
             <Box
               sx={{
                 backgroundColor: "#f2f2f2",
@@ -274,7 +259,7 @@ export default function ChatOnnExactPage() {
             </Box>
           </Box>
 
-          {/* Chat list - now we map over filteredChats */}
+          {/* Chat list */}
           <List sx={{ flex: 1, overflowY: "auto" }}>
             {filteredChats.map((chat, idx) => {
               const isSelected = chat.name === selectedChat.name;
@@ -305,10 +290,7 @@ export default function ChatOnnExactPage() {
                         </Typography>
                       }
                       secondary={
-                        <Typography
-                          variant="caption"
-                          sx={{ color: isSelected ? "#fff" : "#999" }}
-                        >
+                        <Typography variant="caption" sx={{ color: isSelected ? "#fff" : "#999" }}>
                           {chat.message}
                         </Typography>
                       }
@@ -333,7 +315,7 @@ export default function ChatOnnExactPage() {
 
         {/* CENTER CHAT AREA */}
         <Grid item xs={6} sx={{ backgroundColor: "#fff", display: "flex", flexDirection: "column", position: "relative" }}>
-          {/* Chat Header: no call/video icons */}
+          {/* Chat Header */}
           <Box
             sx={{
               p: 2,
@@ -375,21 +357,10 @@ export default function ChatOnnExactPage() {
           </Box>
 
           {/* Hidden file inputs for attachments & images */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            style={{ display: "none" }}
-            onChange={handleFileSelected}
-          />
-          <input
-            type="file"
-            accept="image/*"
-            ref={imageInputRef}
-            style={{ display: "none" }}
-            onChange={handleImageSelected}
-          />
+          <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileSelected} />
+          <input type="file" accept="image/*" ref={imageInputRef} style={{ display: "none" }} onChange={handleImageSelected} />
 
-          {/* The Emoji Picker, shown if showEmojiPicker is true */}
+          {/* The Emoji Picker */}
           {showEmojiPicker && (
             <Box
               sx={{
@@ -406,22 +377,18 @@ export default function ChatOnnExactPage() {
 
           {/* Chat input row */}
           <Box sx={{ p: 2, borderTop: "1px solid #eee", display: "flex", alignItems: "center" }}>
-            {/* InsertEmoticon => toggles emoji picker */}
             <IconButton onClick={toggleEmojiPicker}>
               <InsertEmoticonIcon sx={{ color: "#9b51e0" }} />
             </IconButton>
 
-            {/* Attach file => triggers hidden file input */}
             <IconButton onClick={handleAttachClick}>
               <AttachFileIcon sx={{ color: "#9b51e0" }} />
             </IconButton>
 
-            {/* Attach image => triggers hidden image input */}
             <IconButton onClick={handleImageClick}>
               <ImageIcon sx={{ color: "#9b51e0" }} />
             </IconButton>
 
-            {/* TextField for the message */}
             <TextField
               variant="outlined"
               placeholder="Type a message here..."
@@ -434,7 +401,6 @@ export default function ChatOnnExactPage() {
               sx={{ mx: 2 }}
             />
 
-            {/* Send button in a circle */}
             <IconButton
               onClick={handleSend}
               sx={{
@@ -451,30 +417,14 @@ export default function ChatOnnExactPage() {
           </Box>
         </Grid>
 
-        {/* RIGHT SIDEBAR: Notifications + Suggestions (unchanged) */}
+        {/* RIGHT SIDEBAR: Suggestions only */}
         <Grid item xs={3} sx={{ backgroundColor: "#fff", display: "flex", flexDirection: "column" }}>
-          {/* Notifications */}
-          <Box sx={{ px: 2, py: 3, borderBottom: "1px solid #eee" }}>
-            <Typography variant="h6" sx={{ fontWeight: "bold", mb: 2 }}>
-              Notifications
-            </Typography>
-            {notifications.map((n, i) => (
-              <Typography key={i} variant="body2" sx={{ color: "#333", mb: 1 }}>
-                {n.text}
-              </Typography>
-            ))}
-          </Box>
-
-          {/* Suggestions */}
           <Box sx={{ px: 2, py: 3, overflowY: "auto" }}>
             <Typography variant="h6" sx={{ fontWeight: "bold", mb: 2 }}>
               Suggestions
             </Typography>
             {suggestions.map((sugg, idx) => (
-              <Box
-                key={idx}
-                sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}
-              >
+              <Box key={idx} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Avatar src={sugg.avatar} sx={{ width: 36, height: 36 }} />
                   <Box>
