@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import axios from "axios";
 import { Users } from "lucide-react";
 import Link from "next/link";
 
@@ -11,6 +10,7 @@ interface Group {
   description: string;
   creator_id: string;
   created_at: string;
+  user_status: "member" | "not_joined" | "pending_request" | "pending_invite";
 }
 
 interface GroupListProps {
@@ -41,7 +41,7 @@ export function GroupList({ groups, type, isLoading, refreshGroups, requestToJoi
     );
   }
 
-  if (groups===null) {
+  if (!groups || groups.length === 0) {
     return (
       <Card className="border-2 border-slate-100">
         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
@@ -67,15 +67,25 @@ export function GroupList({ groups, type, isLoading, refreshGroups, requestToJoi
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground line-clamp-2">{group.description}</p>
-            {type === "discover" ? (
-              <Button className="gap-2 bg-[#6C5CE7] hover:bg-[#6C5CE7]/90"  onClick={() => requestToJoin(group.id)}>
+            
+            {/* Handle different group statuses */}
+            {group.user_status === "member" ? (
+              <Button disabled className="w-full bg-gray-300 text-gray-600">
+                You are a member
+              </Button>
+            ) : group.user_status === "not_joined" ? (
+              <Button className="w-full bg-[#6C5CE7] hover:bg-[#6C5CE7]/90" onClick={() => requestToJoin(group.id)}>
                 Request to Join
               </Button>
-            ) : (
-              <Button className="gap-2 bg-[#6C5CE7] hover:bg-[#6C5CE7]/90" onClick={() => enterGroupChat(group.id)}>
-                Enter Group
+            ) : group.user_status === "pending_request" ? (
+              <Button disabled className="w-full bg-yellow-500 text-white">
+                Request Pending
               </Button>
-            )}
+            ) : group.user_status === "pending_invite" ? (
+              <Button disabled className="w-full bg-blue-500 text-white">
+                Invitation Pending
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ))}
