@@ -69,6 +69,7 @@ func main() {
 
 // Groups endpoints
   mux.HandleFunc("/groups", groups.GetAllGroupsHandler(db))                    // Fetch all groups for browsing
+	mux.HandleFunc("/groups/{group_id}", groups.GetGroupDetailsHandler(db))      // Get details of a specific group
   mux.HandleFunc("/groups/search", groups.SearchGroupsHandler(db))             // Search for groups by name
   mux.HandleFunc("/groups/create", groups.CreateGroupHandler(db))              // Create a new group
   mux.HandleFunc("/groups/join", groups.RequestToJoinHandler(db))              // Request to join a group

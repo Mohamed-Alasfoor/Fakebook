@@ -87,6 +87,50 @@ func GetAllGroupsHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+//Fetches details of a specific group
+func GetGroupDetailsHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Get group ID from query parameters
+		groupID := r.URL.Query().Get("group_id")
+		if groupID == "" {
+			http.Error(w, "Missing group_id", http.StatusBadRequest)
+			return
+		}
+
+		// Query the database for group details
+		var groupName, groupDescription, createdAt string
+		err := db.QueryRow(`
+			SELECT name, description, created_at FROM groups WHERE id = ?
+		`, groupID).Scan(&groupName, &groupDescription, &createdAt)
+
+		if err == sql.ErrNoRows {
+			http.Error(w, "Group not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			http.Error(w, "Failed to fetch group details", http.StatusInternalServerError)
+			return
+		}
+
+		// Create response
+		response := map[string]string{
+			"group_id":     groupID,
+			"name":         groupName,
+			"description":  groupDescription,
+			"created_at":   createdAt,
+		}
+
+		// Send response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+
 
 //Allows users to search for groups by name
 func SearchGroupsHandler(db *sql.DB) http.HandlerFunc {
