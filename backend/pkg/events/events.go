@@ -57,9 +57,9 @@ func CreateGroupEventHandler(db *sql.DB) http.HandlerFunc {
 
 		// Insert event into database
 _, err = db.Exec(`
-INSERT INTO events (id, group_id, title, description, event_date) 
-VALUES (?, ?, ?, ?, ?)`, 
-eventID, event.GroupID, event.Title, event.Description, event.EventDate)
+INSERT INTO events (id, group_id, title, description, event_date, created_at) 
+VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`, 
+eventID, event.GroupID, event.Title, event.Description, event.EventDate )
 if err != nil {
 http.Error(w, err.Error(), http.StatusInternalServerError)
 return
