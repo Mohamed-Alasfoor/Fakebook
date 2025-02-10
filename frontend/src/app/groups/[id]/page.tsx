@@ -33,7 +33,20 @@ interface Member {
   nickname?: string;
   avatar?: string;
 }
+interface Event {
+  id: string;
+  group_id: string;
+  title: string;
+  description: string;
+  date_time: string;
+  creator_id: string;
+}
 
+interface RSVPStatus {
+  event_id: string;
+  user_id: string;
+  status: "going" | "not_going" | null;
+}
 
 export default function GroupView() {
   const params = useParams();
@@ -46,7 +59,12 @@ export default function GroupView() {
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [postContent, setPostContent] = useState("");
   const [postFile, setPostFile] = useState<File | null>(null);
-
+  const [events, setEvents] = useState<Event[]>([]);
+  const [rsvps, setRsvps] = useState<RSVPStatus[]>([]);
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventDescription, setEventDescription] = useState("");
+  const [eventDateTime, setEventDateTime] = useState("");
   useEffect(() => {
     if (!params?.id) return;
 
@@ -101,7 +119,62 @@ export default function GroupView() {
       alert("Error creating post.");
     }
   };
+  // Fetch RSVP statuses for events
+  useEffect(() => {
+    if (events.length === 0) return;
 
+    const fetchRSVPs = async () => {
+      try {
+        const rsvpResponses = await Promise.all(
+          events.map((event) =>
+            axios.get(`http://localhost:8080/groups/events/rsvps?event_id=${event.id}`, { withCredentials: true }).catch(() => null)
+          )
+        );
+
+        const rsvpData = rsvpResponses.flatMap((response) => response?.data || []);
+        setRsvps(rsvpData);
+      } catch (error) {
+        console.error("Error fetching RSVPs:", error);
+      }
+    };
+
+    fetchRSVPs();
+  }, [events]);
+
+  // Create a new event
+  const handleCreateEvent = async () => {
+    if (!eventTitle.trim() || !eventDescription.trim() || !eventDateTime) {
+      return alert("All fields are required.");
+    }
+
+    try {
+      const response = await axios.post("http://localhost:8080/groups/events/create", {
+        group_id: params.id,
+        title: eventTitle,
+        description: eventDescription,
+        date_time: eventDateTime,
+      }, { withCredentials: true });
+
+      setEvents([{ id: response.data.event_id, group_id: params.id as string, title: eventTitle, description: eventDescription, date_time: eventDateTime, creator_id: "me" }, ...events]);
+      setEventTitle("");
+      setEventDescription("");
+      setEventDateTime("");
+      setIsCreatingEvent(false);
+    } catch (error) {
+      console.error("Failed to create event:", error);
+      alert("Error creating event.");
+    }
+  };
+
+  // RSVP to an event
+  const handleRSVP = async (eventId: string, status: "going" | "not_going") => {
+    try {
+      await axios.post("http://localhost:8080/groups/events/rsvp", { event_id: eventId, status }, { withCredentials: true });
+      setRsvps([...rsvps, { event_id: eventId, user_id: "me", status }]);
+    } catch (error) {
+      console.error("Failed to RSVP:", error);
+    }
+  };
   if (isLoading) return <div className="text-center py-10 text-gray-500">Loading group details...</div>;
   if (!group) return <div className="text-center py-10 text-red-500">Group not found.</div>;
 
@@ -215,8 +288,47 @@ export default function GroupView() {
                   </div>
                 )}
               </TabsContent>
+
+               {/* Events Tab */}
+               <TabsContent value="events">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">Group Events</h3>
+                  <Dialog open={isCreatingEvent} onOpenChange={setIsCreatingEvent}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-[#6C5CE7] text-white flex items-center">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Event
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create an Event</DialogTitle>
+                      </DialogHeader>
+                      <Input placeholder="Event Title" value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} />
+                      <Textarea placeholder="Event Description" value={eventDescription} onChange={(e) => setEventDescription(e.target.value)} />
+                      <Input type="datetime-local" value={eventDateTime} onChange={(e) => setEventDateTime(e.target.value)} />
+                      <Button className="w-full mt-2 bg-[#6C5CE7] text-white" onClick={handleCreateEvent}>
+                        Create Event
+                      </Button>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                {events.map((event) => (
+                  <Card key={event.id} className="border shadow-sm mb-4">
+                    <CardContent className="p-4">
+                      <p className="text-lg font-semibold">{event.title}</p>
+                      <p className="text-sm text-gray-500">{new Date(event.date_time).toLocaleString()}</p>
+                      <p className="mt-2">{event.description}</p>
+                      <Button className="mr-2 mt-2" onClick={() => handleRSVP(event.id, "going")}>Going</Button>
+                      <Button variant="destructive" className="mt-2" onClick={() => handleRSVP(event.id, "not_going")}>Not Going</Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </TabsContent>
             </Tabs>
           </CardContent>
+          
         </Card>
       </div>
     </div>
