@@ -22,7 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { MessageCircle, Users, Calendar, Plus } from "lucide-react";
-import PostView from "../postViwe";
+import PostView from "@/components/groups/postView";
 
 interface Group {
   id: string;

@@ -5,9 +5,9 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreateGroupDialog } from "./create-group-dialog";
-import { GroupList } from "./group-list";
-import { useGroups } from "./use-groups";
+import { CreateGroupDialog } from "../../components/groups/create-group-dialog";
+import { GroupList } from "@/components/groups/group-list";
+import { useGroups } from "../../lib/hooks/use-groups";
 import axios from "axios";
 
 export default function GroupsPage() {
@@ -45,10 +45,10 @@ export default function GroupsPage() {
               <TabsTrigger value="joined">My Groups</TabsTrigger>
             </TabsList>
             <TabsContent value="discover">
-              <GroupList groups={groups} type="discover" isLoading={isLoading} refreshGroups={refreshGroups} requestToJoin={requestToJoin} enterGroupChat={enterGroupChat} />
+              <GroupList groups={groups as any[]} type="discover" isLoading={isLoading} refreshGroups={refreshGroups} requestToJoin={requestToJoin} enterGroupChat={enterGroupChat} />
             </TabsContent>
             <TabsContent value="joined">
-              <GroupList groups={joinedGroups} type="joined" isLoading={isLoading} refreshGroups={refreshGroups} requestToJoin={requestToJoin} enterGroupChat={enterGroupChat} />
+              <GroupList groups={joinedGroups as any[]} type="joined" isLoading={isLoading} refreshGroups={refreshGroups} requestToJoin={requestToJoin} enterGroupChat={enterGroupChat} />
             </TabsContent>
           </Tabs>
         </div>
