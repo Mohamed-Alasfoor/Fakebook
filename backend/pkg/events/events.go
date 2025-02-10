@@ -105,7 +105,7 @@ func CreateGroupEventHandler(db *sql.DB) http.HandlerFunc {
 			}
 
 			rows, err := db.Query(`
-					SELECT id, group_id, title, description, event_date, creator_id 
+					SELECT id, group_id, title, description, event_date
 					FROM events WHERE group_id = ? ORDER BY event_date ASC`, groupID)
 			if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -115,13 +115,13 @@ func CreateGroupEventHandler(db *sql.DB) http.HandlerFunc {
 
 			var events []map[string]string
 			for rows.Next() {
-					var id, groupID, title, description, dateTime, creatorID string
-					if err := rows.Scan(&id, &groupID, &title, &description, &dateTime, &creatorID); err != nil {
+					var id, groupID, title, description, event_date string
+					if err := rows.Scan(&id, &groupID, &title, &description, &event_date); err != nil {
 							http.Error(w, "Failed to parse events", http.StatusInternalServerError)
 							return
 					}
 					event := map[string]string{
-							"id": id, "group_id": groupID, "title": title, "description": description, "date_time": dateTime, "creator_id": creatorID,
+							"id": id, "group_id": groupID, "title": title, "description": description, "event_date": event_date,
 					}
 					events = append(events, event)
 			}
