@@ -61,7 +61,7 @@ func CreateGroupEventHandler(db *sql.DB) http.HandlerFunc {
 			VALUES (?, ?, ?, ?, ?, ?)`, 
 			eventID, event.GroupID, event.Title, event.Description, event.DateTime, userID)
 		if err != nil {
-			http.Error(w, "Failed to create event", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
