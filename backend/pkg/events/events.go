@@ -56,15 +56,14 @@ func CreateGroupEventHandler(db *sql.DB) http.HandlerFunc {
 		eventID := uuid.New().String()
 
 		// Insert event into database
-_, err = db.Exec(`
-INSERT INTO events (id, group_id, title, description, event_date, created_at) 
-VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`, 
-eventID, event.GroupID, event.Title, event.Description, event.EventDate )
-if err != nil {
-http.Error(w, err.Error(), http.StatusInternalServerError)
-return
-}
-
+   _, err = db.Exec(`
+   INSERT INTO events (id, group_id, title, description, event_date) 
+   VALUES (?, ?, ?, ?, ?)`, 
+   eventID, event.GroupID, event.Title, event.Description, event.EventDate )
+   if err != nil {
+   http.Error(w, err.Error(), http.StatusInternalServerError)
+  return
+   }
 
 		// Notify group members about the new event
 		rows, err := db.Query(`SELECT user_id FROM group_membership WHERE group_id = ? AND status = 'member' AND user_id != ?`, event.GroupID, userID)
@@ -106,8 +105,8 @@ return
 			}
 
 			rows, err := db.Query(`
-					SELECT id, group_id, title, description, date_time, creator_id 
-					FROM group_events WHERE group_id = ? ORDER BY date_time ASC`, groupID)
+					SELECT id, group_id, title, description, event_date, creator_id 
+					FROM events WHERE group_id = ? ORDER BY event_date ASC`, groupID)
 			if err != nil {
 					http.Error(w, "Failed to fetch events", http.StatusInternalServerError)
 					return
