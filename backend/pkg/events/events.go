@@ -15,7 +15,7 @@ type Event struct {
 	GroupID     string `json:"group_id"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
-	DateTime    string `json:"date_time"`
+	EventDate   string `json:"event_date"`
 	CreatorID   string `json:"creator_id"`
 }
 
@@ -39,15 +39,15 @@ func CreateGroupEventHandler(db *sql.DB) http.HandlerFunc {
 			GroupID     string `json:"group_id"`
 			Title       string `json:"title"`
 			Description string `json:"description"`
-			DateTime    string `json:"date_time"`
-		}
+			EventDate   string `json:"event_date"` 
+	}
 
 		if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		if event.GroupID == "" || event.Title == "" || event.Description == "" || event.DateTime == "" {
+		if event.GroupID == "" || event.Title == "" || event.Description == "" || event.EventDate== "" {
 			http.Error(w, "All fields are required", http.StatusBadRequest)
 			return
 		}
@@ -56,14 +56,15 @@ func CreateGroupEventHandler(db *sql.DB) http.HandlerFunc {
 		eventID := uuid.New().String()
 
 		// Insert event into database
-		_, err = db.Exec(`
-			INSERT INTO events (id, group_id, title, description, date_time, creator_id) 
-			VALUES (?, ?, ?, ?, ?, ?)`, 
-			eventID, event.GroupID, event.Title, event.Description, event.DateTime, userID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+_, err = db.Exec(`
+INSERT INTO events (id, group_id, title, description, event_date) 
+VALUES (?, ?, ?, ?, ?)`, 
+eventID, event.GroupID, event.Title, event.Description, event.EventDate)
+if err != nil {
+http.Error(w, err.Error(), http.StatusInternalServerError)
+return
+}
+
 
 		// Notify group members about the new event
 		rows, err := db.Query(`SELECT user_id FROM group_membership WHERE group_id = ? AND status = 'member' AND user_id != ?`, event.GroupID, userID)
