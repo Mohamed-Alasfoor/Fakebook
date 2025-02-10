@@ -108,7 +108,7 @@ func CreateGroupEventHandler(db *sql.DB) http.HandlerFunc {
 					SELECT id, group_id, title, description, event_date, creator_id 
 					FROM events WHERE group_id = ? ORDER BY event_date ASC`, groupID)
 			if err != nil {
-					http.Error(w, "Failed to fetch events", http.StatusInternalServerError)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 			}
 			defer rows.Close()
