@@ -82,9 +82,22 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
               )}
             </div>
           </div>
-          <Button className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white" onClick={() => followUser(user.id)}>
+          {user.is_my_profile ? (
+            <Button variant="outline" className="mt-4">
+              Edit Profile
+            </Button>
+          ) : !user.is_following? (
+           <Button className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white" onClick={() => followUser(user.id)}>
             {user.private ? "Request to Follow" : "Follow"}
           </Button>
+          ):(
+            <Button className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white" onClick={() => unfollowUser(user.id)}>
+            Unfollow
+          </Button>
+          )
+          
+          
+          }
         </div>
       </CardContent>
     </Card>
