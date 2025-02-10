@@ -4,12 +4,25 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { MessageCircle, Users, Calendar, Plus } from "lucide-react";
+import PostView from "../postViwe";
 
 interface Group {
   id: string;
@@ -65,19 +78,36 @@ export default function GroupView() {
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
   const [eventDateTime, setEventDateTime] = useState("");
-  useEffect(() => {
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);  useEffect(() => {
     if (!params?.id) return;
 
     const fetchGroupData = async () => {
       try {
         const groupId = params.id as string;
-        const [groupResponse, postsResponse, membersResponse] = await Promise.all([
-          axios.get(`http://localhost:8080/groups/{group_id}?group_id=${groupId}`, { withCredentials: true }).catch(() => null),
-          axios.get(`http://localhost:8080/groups/posts?group_id=${groupId}`, { withCredentials: true }).catch(() => null),
-          axios.get(`http://localhost:8080/groups/members?group_id=${groupId}`, { withCredentials: true }).catch(() => null),
-        ]);
+        const [groupResponse, postsResponse, membersResponse] =
+          await Promise.all([
+            axios
+              .get(
+                `http://localhost:8080/groups/{group_id}?group_id=${groupId}`,
+                { withCredentials: true }
+              )
+              .catch(() => null),
+            axios
+              .get(`http://localhost:8080/groups/posts?group_id=${groupId}`, {
+                withCredentials: true,
+              })
+              .catch(() => null),
+            axios
+              .get(`http://localhost:8080/groups/members?group_id=${groupId}`, {
+                withCredentials: true,
+              })
+              .catch(() => null),
+          ]);
 
-        if (!groupResponse?.data || Object.keys(groupResponse.data).length === 0) {
+        if (
+          !groupResponse?.data ||
+          Object.keys(groupResponse.data).length === 0
+        ) {
           router.push("/groups");
           return;
         }
@@ -105,12 +135,25 @@ export default function GroupView() {
     if (postFile) formData.append("file", postFile);
 
     try {
-      const response = await axios.post("http://localhost:8080/groups/posts/create", formData, {
-        withCredentials: true,
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await axios.post(
+        "http://localhost:8080/groups/posts/create",
+        formData,
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
 
-      setPosts([{ id: response.data.post_id, user_id: "me", content: postContent, image_url: response.data.image_url, created_at: new Date().toISOString() }, ...posts]);
+      setPosts([
+        {
+          id: response.data.post_id,
+          user_id: "me",
+          content: postContent,
+          image_url: response.data.image_url,
+          created_at: new Date().toISOString(),
+        },
+        ...posts,
+      ]);
       setPostContent("");
       setPostFile(null);
       setIsCreatingPost(false);
@@ -127,11 +170,18 @@ export default function GroupView() {
       try {
         const rsvpResponses = await Promise.all(
           events.map((event) =>
-            axios.get(`http://localhost:8080/groups/events/rsvps?event_id=${event.id}`, { withCredentials: true }).catch(() => null)
+            axios
+              .get(
+                `http://localhost:8080/groups/events/rsvps?event_id=${event.id}`,
+                { withCredentials: true }
+              )
+              .catch(() => null)
           )
         );
 
-        const rsvpData = rsvpResponses.flatMap((response) => response?.data || []);
+        const rsvpData = rsvpResponses.flatMap(
+          (response) => response?.data || []
+        );
         setRsvps(rsvpData);
       } catch (error) {
         console.error("Error fetching RSVPs:", error);
@@ -148,14 +198,28 @@ export default function GroupView() {
     }
 
     try {
-      const response = await axios.post("http://localhost:8080/groups/events/create", {
-        group_id: params.id,
-        title: eventTitle,
-        description: eventDescription,
-        date_time: eventDateTime,
-      }, { withCredentials: true });
+      const response = await axios.post(
+        "http://localhost:8080/groups/events/create",
+        {
+          group_id: params.id,
+          title: eventTitle,
+          description: eventDescription,
+          date_time: eventDateTime,
+        },
+        { withCredentials: true }
+      );
 
-      setEvents([{ id: response.data.event_id, group_id: params.id as string, title: eventTitle, description: eventDescription, date_time: eventDateTime, creator_id: "me" }, ...events]);
+      setEvents([
+        {
+          id: response.data.event_id,
+          group_id: params.id as string,
+          title: eventTitle,
+          description: eventDescription,
+          date_time: eventDateTime,
+          creator_id: "me",
+        },
+        ...events,
+      ]);
       setEventTitle("");
       setEventDescription("");
       setEventDateTime("");
@@ -169,15 +233,27 @@ export default function GroupView() {
   // RSVP to an event
   const handleRSVP = async (eventId: string, status: "going" | "not_going") => {
     try {
-      await axios.post("http://localhost:8080/groups/events/rsvp", { event_id: eventId, status }, { withCredentials: true });
+      await axios.post(
+        "http://localhost:8080/groups/events/rsvp",
+        { event_id: eventId, status },
+        { withCredentials: true }
+      );
       setRsvps([...rsvps, { event_id: eventId, user_id: "me", status }]);
     } catch (error) {
       console.error("Failed to RSVP:", error);
     }
   };
-  if (isLoading) return <div className="text-center py-10 text-gray-500">Loading group details...</div>;
-  if (!group) return <div className="text-center py-10 text-red-500">Group not found.</div>;
-
+  if (isLoading)
+    return (
+      <div className="text-center py-10 text-gray-500">
+        Loading group details...
+      </div>
+    );
+  if (!group)
+    return (
+      <div className="text-center py-10 text-red-500">Group not found.</div>
+    );
+  
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -226,7 +302,10 @@ export default function GroupView() {
               <TabsContent value="posts" className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold">Group Posts</h3>
-                  <Dialog open={isCreatingPost} onOpenChange={setIsCreatingPost}>
+                  <Dialog
+                    open={isCreatingPost}
+                    onOpenChange={setIsCreatingPost}
+                  >
                     <DialogTrigger asChild>
                       <Button className="bg-[#6C5CE7] text-white flex items-center">
                         <Plus className="w-4 h-4 mr-2" />
@@ -242,34 +321,62 @@ export default function GroupView() {
                         value={postContent}
                         onChange={(e) => setPostContent(e.target.value)}
                       />
-                      <Input type="file" accept="image/*" onChange={(e) => setPostFile(e.target.files?.[0] || null)} />
-                      <Button className="w-full mt-2 bg-[#6C5CE7] text-white" onClick={handleCreatePost}>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          setPostFile(e.target.files?.[0] || null)
+                        }
+                      />
+                      <Button
+                        className="w-full mt-2 bg-[#6C5CE7] text-white"
+                        onClick={handleCreatePost}
+                      >
                         Post
                       </Button>
                     </DialogContent>
                   </Dialog>
                 </div>
 
-                {posts.length === 0 ? (
-                  <p className="text-gray-500 text-center">No posts yet. Be the first to post!</p>
+                {selectedPost ? (
+                  <PostView
+                    post={selectedPost}
+                    onClose={() => setSelectedPost(null)}
+                  />
+                ) : posts.length === 0 ? (
+                  <p className="text-gray-500 text-center">No posts yet.</p>
                 ) : (
                   posts.map((post) => (
-                    <Card key={post.id} className="border shadow-sm">
+                    <Card
+                      key={post.id}
+                      className="border shadow-sm cursor-pointer"
+                      onClick={() => setSelectedPost(post)}
+                    >
                       <CardContent className="p-4">
-                        <p className="text-sm text-gray-500">Posted on {new Date(post.created_at).toLocaleString()}</p>
+                        <p className="text-sm text-gray-500">
+                          Posted on {new Date(post.created_at).toLocaleString()}
+                        </p>
                         <p className="mt-2">{post.content}</p>
-                        {post.image_url && <img src={`http://localhost:8080/uploads/${post.image_url}`} alt="Post Image" className="mt-2 rounded-md" />}
+                        {post.image_url && (
+                          <img
+                            src={`http://localhost:8080/uploads/${post.image_url}`}
+                            alt="Post Image"
+                            className="mt-2 rounded-md"
+                          />
+                        )}
                       </CardContent>
                     </Card>
                   ))
                 )}
               </TabsContent>
 
-               {/* Members Tab */}
-               <TabsContent value="members">
+              {/* Members Tab */}
+              <TabsContent value="members">
                 <h3 className="text-lg font-semibold mb-4">Group Members</h3>
                 {isLoadingMembers ? (
-                  <p className="text-center text-gray-500">Loading members...</p>
+                  <p className="text-center text-gray-500">
+                    Loading members...
+                  </p>
                 ) : members.length === 0 ? (
                   <p className="text-center text-gray-500">No members yet.</p>
                 ) : (
@@ -277,10 +384,15 @@ export default function GroupView() {
                     {members.map((member) => (
                       <Card key={member.id} className="border shadow-sm">
                         <CardContent className="p-4 flex items-center space-x-4">
-                          
                           <div>
-                            <p className="font-semibold">{member.first_name} {member.last_name}</p>
-                            {member.nickname && <p className="text-gray-500 text-sm">@{member.nickname}</p>}
+                            <p className="font-semibold">
+                              {member.first_name} {member.last_name}
+                            </p>
+                            {member.nickname && (
+                              <p className="text-gray-500 text-sm">
+                                @{member.nickname}
+                              </p>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -289,11 +401,14 @@ export default function GroupView() {
                 )}
               </TabsContent>
 
-               {/* Events Tab */}
-               <TabsContent value="events">
+              {/* Events Tab */}
+              <TabsContent value="events">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold">Group Events</h3>
-                  <Dialog open={isCreatingEvent} onOpenChange={setIsCreatingEvent}>
+                  <Dialog
+                    open={isCreatingEvent}
+                    onOpenChange={setIsCreatingEvent}
+                  >
                     <DialogTrigger asChild>
                       <Button className="bg-[#6C5CE7] text-white flex items-center">
                         <Plus className="w-4 h-4 mr-2" />
@@ -304,10 +419,25 @@ export default function GroupView() {
                       <DialogHeader>
                         <DialogTitle>Create an Event</DialogTitle>
                       </DialogHeader>
-                      <Input placeholder="Event Title" value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} />
-                      <Textarea placeholder="Event Description" value={eventDescription} onChange={(e) => setEventDescription(e.target.value)} />
-                      <Input type="datetime-local" value={eventDateTime} onChange={(e) => setEventDateTime(e.target.value)} />
-                      <Button className="w-full mt-2 bg-[#6C5CE7] text-white" onClick={handleCreateEvent}>
+                      <Input
+                        placeholder="Event Title"
+                        value={eventTitle}
+                        onChange={(e) => setEventTitle(e.target.value)}
+                      />
+                      <Textarea
+                        placeholder="Event Description"
+                        value={eventDescription}
+                        onChange={(e) => setEventDescription(e.target.value)}
+                      />
+                      <Input
+                        type="datetime-local"
+                        value={eventDateTime}
+                        onChange={(e) => setEventDateTime(e.target.value)}
+                      />
+                      <Button
+                        className="w-full mt-2 bg-[#6C5CE7] text-white"
+                        onClick={handleCreateEvent}
+                      >
                         Create Event
                       </Button>
                     </DialogContent>
@@ -318,17 +448,29 @@ export default function GroupView() {
                   <Card key={event.id} className="border shadow-sm mb-4">
                     <CardContent className="p-4">
                       <p className="text-lg font-semibold">{event.title}</p>
-                      <p className="text-sm text-gray-500">{new Date(event.date_time).toLocaleString()}</p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(event.date_time).toLocaleString()}
+                      </p>
                       <p className="mt-2">{event.description}</p>
-                      <Button className="mr-2 mt-2" onClick={() => handleRSVP(event.id, "going")}>Going</Button>
-                      <Button variant="destructive" className="mt-2" onClick={() => handleRSVP(event.id, "not_going")}>Not Going</Button>
+                      <Button
+                        className="mr-2 mt-2"
+                        onClick={() => handleRSVP(event.id, "going")}
+                      >
+                        Going
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="mt-2"
+                        onClick={() => handleRSVP(event.id, "not_going")}
+                      >
+                        Not Going
+                      </Button>
                     </CardContent>
                   </Card>
                 ))}
               </TabsContent>
             </Tabs>
           </CardContent>
-          
         </Card>
       </div>
     </div>
