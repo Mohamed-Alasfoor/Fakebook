@@ -90,47 +90,59 @@ func GetAllGroupsHandler(db *sql.DB) http.HandlerFunc {
 //Fetches details of a specific group
 func GetGroupDetailsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-			return
-		}
+			if r.Method != http.MethodGet {
+					http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+					return
+			}
 
-		// Get group ID from query parameters
-		groupID := r.URL.Query().Get("group_id")
-		if groupID == "" {
-			http.Error(w, "Missing group_id", http.StatusBadRequest)
-			return
-		}
+			userID, err := sessions.GetUserIDFromSession(r)
+			if err != nil {
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+			}
 
-		// Query the database for group details
-		var groupName, groupDescription, createdAt string
-		err := db.QueryRow(`
-			SELECT name, description, created_at FROM groups WHERE id = ?
-		`, groupID).Scan(&groupName, &groupDescription, &createdAt)
+			groupID := r.URL.Query().Get("group_id")
+			if groupID == "" {
+					http.Error(w, "Missing group_id", http.StatusBadRequest)
+					return
+			}
 
-		if err == sql.ErrNoRows {
-			http.Error(w, "Group not found", http.StatusNotFound)
-			return
-		} else if err != nil {
-			http.Error(w, "Failed to fetch group details", http.StatusInternalServerError)
-			return
-		}
+			var groupName, groupDescription, createdAt string
+			err = db.QueryRow(`SELECT name, description, created_at FROM groups WHERE id = ?`, groupID).Scan(&groupName, &groupDescription, &createdAt)
+			if err == sql.ErrNoRows {
+					http.Error(w, "Group not found", http.StatusNotFound)
+					return
+			} else if err != nil {
+					http.Error(w, "Failed to fetch group details", http.StatusInternalServerError)
+					return
+			}
 
-		// Create response
-		response := map[string]string{
-			"group_id":     groupID,
-			"name":         groupName,
-			"description":  groupDescription,
-			"created_at":   createdAt,
-		}
+			// Check if user is a member
+			var isMember bool
+			err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
 
-		// Send response
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+			if err != nil || !isMember {
+					// Non-members can only see limited info
+					json.NewEncoder(w).Encode(map[string]string{
+							"group_id":    groupID,
+							"name":        groupName,
+							"description": groupDescription,
+							"created_at":  createdAt,
+							"message":     "Join this group to see more details.",
+					})
+					return
+			}
+
+			// Members can see full details
+			json.NewEncoder(w).Encode(map[string]string{
+					"group_id":    groupID,
+					"name":        groupName,
+					"description": groupDescription,
+					"created_at":  createdAt,
+					"status":      "member",
+			})
 	}
 }
-
-
 
 //Allows users to search for groups by name
 func SearchGroupsHandler(db *sql.DB) http.HandlerFunc {
@@ -726,12 +738,27 @@ func GetGroupMembersHandler(db *sql.DB) http.HandlerFunc {
 					return
 			}
 
+			userID, err := sessions.GetUserIDFromSession(r)
+			if err != nil {
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+			}
+
 			// Extract group ID from query params
 			groupID := r.URL.Query().Get("group_id")
 			if groupID == "" {
 					http.Error(w, "Missing group_id", http.StatusBadRequest)
 					return
 			}
+
+			   // Check if user is a member
+				 var isMember bool
+				 err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
+ 
+				 if err != nil || !isMember {
+						 http.Error(w, "Forbidden: Only members can view the member list", http.StatusForbidden)
+						 return
+				 }
 
 			// Fetch members of the group
 			rows, err := db.Query(`
@@ -777,26 +804,39 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+		}
+
+		groupID := r.Form.Get("group_id")
+		if groupID == "" {
+				http.Error(w, "Group ID is required", http.StatusBadRequest)
+				return
+		}
+
+		// Check if the user is a member
+		var isMember bool
+		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
+
+		if err != nil || !isMember {
+				http.Error(w, "Forbidden: Only members can create posts", http.StatusForbidden)
+				return
+		}
+
 		// Parse multipart form (for file uploads)
 		const maxUploadSize = 100 << 20 // 100 MB
 		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
 			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		// Get user ID from session
-		userID, err := sessions.GetUserIDFromSession(r)
-		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
+		
 		// Extract form values
-		groupID := r.Form.Get("group_id")
 		content := r.Form.Get("content")
 
-		if groupID == "" || strings.TrimSpace(content) == "" {
-			http.Error(w, "Group ID and content are required", http.StatusBadRequest)
+		if strings.TrimSpace(content) == "" {
+			http.Error(w, "content are required", http.StatusBadRequest)
 			return
 		}
 
