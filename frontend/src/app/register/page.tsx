@@ -18,8 +18,10 @@ import { AuthLayout } from "@/components/auth/auth-layout";
 import { PasswordInput } from "@/components/auth/password";
 import { LoginButtons } from "@/components/auth/login-buttons";
 import axios from "axios";
+import { useRouter } from "next/navigation"; // For pages directory; for app router, import from "next/navigation"
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -65,9 +67,12 @@ export default function RegisterPage() {
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        withCredentials: true, // This ensures cookies are sent/received if needed.
       });
 
-      alert(res.data.message || "Account created successfully!");
+      // Optionally, store the returned user_id/session info if needed.
+      // Then, automatically redirect to the chat page.
+      router.push("/"); // Adjust the route as needed.
     } catch (err: any) {
       console.error(err);
       alert(
