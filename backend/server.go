@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"social-network/pkg/auth"
+	"social-network/pkg/chat"
 	"social-network/pkg/comments"
 	"social-network/pkg/db/sqlite"
 	"social-network/pkg/events"
@@ -110,6 +111,14 @@ func main() {
 	// Group Chat WebSocket
 mux.HandleFunc("/groups/chat", groups.GroupChatHandler(db))
 mux.HandleFunc("/groups/chat/messages", groups.GetGroupChatMessagesHandler(db))  // Fetch previous messages API
+
+// Private Chat Websocket
+mux.HandleFunc("/chat/private", chat.PrivateChatHandler(db))
+mux.HandleFunc("/markread", chat.MarkMessageReadHandler(db))
+mux.HandleFunc("/chat/history", chat.GetPrivateChatHistoryHandler(db))
+mux.HandleFunc("/chat/online", chat.GetOnlineUsersHandler())
+
+
 
 
 
