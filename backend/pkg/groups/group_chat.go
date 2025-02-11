@@ -3,34 +3,43 @@ package groups
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
-
 	"github.com/gorilla/websocket"
 	"github.com/google/uuid"
 	"social-network/pkg/sessions"
 )
 
-// WebSocket connection manager
-var clients = make(map[*websocket.Conn]string) // Stores user ID for each connection
+// Client holds connection-specific data.
+type Client struct {
+	Conn    *websocket.Conn
+	UserID  string
+	GroupID string
+}
+
+// Global map to hold active WebSocket connections.
+var clients = make(map[*websocket.Conn]Client)
 var clientsMutex = sync.Mutex{}
+
+// Upgrader upgrades HTTP connections to WebSocket connections.
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true }, // Allow all connections
+	// Allow connections from any origin (adjust this in production)
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-// ChatMessage struct for messages
+// ChatMessage represents the message structure.
 type ChatMessage struct {
-	GroupID  string `json:"group_id"`
-	SenderID string `json:"sender_id"`
+	GroupID  string `json:"group_id"`  // This field will be overridden.
+	SenderID string `json:"sender_id"` // This field will be overridden.
 	Message  string `json:"message"`
+	// Optionally, you could include a timestamp if needed.
 }
 
-// WebSocket handler for group chat
+// GroupChatHandler upgrades the connection and processes messages.
 func GroupChatHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Upgrade HTTP to WebSocket
+		// Upgrade the HTTP connection to a WebSocket.
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("WebSocket upgrade error:", err)
@@ -38,34 +47,38 @@ func GroupChatHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer conn.Close()
 
-		// Authenticate user
+		// Authenticate the user.
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			conn.WriteMessage(websocket.TextMessage, []byte("Unauthorized"))
 			return
 		}
 
-		// Get group ID from query params
+		// Retrieve the group ID from query parameters.
 		groupID := r.URL.Query().Get("group_id")
 		if groupID == "" {
 			conn.WriteMessage(websocket.TextMessage, []byte("Missing group_id"))
 			return
 		}
 
-		// Check if user is a member of the group
+		// Check if the user is a member of the group.
 		var isMember bool
-		err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?)", groupID, userID).Scan(&isMember)
+		err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ?)", groupID, userID).Scan(&isMember)
 		if err != nil || !isMember {
 			conn.WriteMessage(websocket.TextMessage, []byte("Not a member of this group"))
 			return
 		}
 
-		// Add user to WebSocket connections
+		// Add the connection to our clients map.
 		clientsMutex.Lock()
-		clients[conn] = userID
+		clients[conn] = Client{
+			Conn:    conn,
+			UserID:  userID,
+			GroupID: groupID,
+		}
 		clientsMutex.Unlock()
 
-		// Listen for incoming messages
+		// Listen for incoming messages.
 		for {
 			_, messageBytes, err := conn.ReadMessage()
 			if err != nil {
@@ -73,40 +86,54 @@ func GroupChatHandler(db *sql.DB) http.HandlerFunc {
 				break
 			}
 
-			// Parse message
 			var msg ChatMessage
-			err = json.Unmarshal(messageBytes, &msg)
-			if err != nil {
-				log.Println("Invalid message format")
+			if err := json.Unmarshal(messageBytes, &msg); err != nil {
+				log.Println("Invalid message format:", err)
 				continue
 			}
 
-			// Save message to database
+			// Override the fields to ensure data integrity.
+			msg.SenderID = userID
+			msg.GroupID = groupID
+
+			// Save the message to the database.
 			messageID := uuid.New().String()
 			_, err = db.Exec("INSERT INTO group_chat_messages (id, group_id, sender_id, message) VALUES (?, ?, ?, ?)",
-				messageID, msg.GroupID, userID, msg.Message)
+				messageID, msg.GroupID, msg.SenderID, msg.Message)
 			if err != nil {
 				log.Println("Failed to save message:", err)
 				continue
 			}
 
-			// Broadcast message to all clients
-			broadcastMessage := fmt.Sprintf(`{"group_id":"%s","sender_id":"%s","message":"%s"}`, msg.GroupID, msg.SenderID, msg.Message)
+			// Marshal the message for broadcasting.
+			broadcastMessage, err := json.Marshal(msg)
+			if err != nil {
+				log.Println("Failed to marshal message:", err)
+				continue
+			}
+
+			// Broadcast the message only to clients in the same group.
 			clientsMutex.Lock()
-			for client := range clients {
-				client.WriteMessage(websocket.TextMessage, []byte(broadcastMessage))
+			for clientConn, client := range clients {
+				if client.GroupID == groupID {
+					if err := clientConn.WriteMessage(websocket.TextMessage, broadcastMessage); err != nil {
+						log.Println("Write error, closing connection:", err)
+						clientConn.Close()
+						delete(clients, clientConn)
+					}
+				}
 			}
 			clientsMutex.Unlock()
 		}
 
-		// Remove client when they disconnect
+		// On disconnect, remove the client.
 		clientsMutex.Lock()
 		delete(clients, conn)
 		clientsMutex.Unlock()
 	}
 }
 
-// Fetches previous messages from the group chat
+// GetGroupChatMessagesHandler retrieves past messages for a given group.
 func GetGroupChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		groupID := r.URL.Query().Get("group_id")
@@ -115,7 +142,7 @@ func GetGroupChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Query old messages
+		// Query past messages. Make sure your migration created a "created_at" column.
 		rows, err := db.Query(`
 			SELECT sender_id, message, created_at
 			FROM group_chat_messages
@@ -128,21 +155,23 @@ func GetGroupChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		// Prepare response
-		var messages []ChatMessage
+		// If you want to include timestamps, you could extend ChatMessage.
+		type MessageResponse struct {
+			SenderID  string `json:"sender_id"`
+			Message   string `json:"message"`
+			CreatedAt string `json:"created_at"`
+		}
+		var messages []MessageResponse
 		for rows.Next() {
-			var msg ChatMessage
-			err := rows.Scan(&msg.SenderID, &msg.Message)
-			if err != nil {
+			var msg MessageResponse
+			if err := rows.Scan(&msg.SenderID, &msg.Message, &msg.CreatedAt); err != nil {
 				http.Error(w, "Error processing messages", http.StatusInternalServerError)
 				return
 			}
 			messages = append(messages, msg)
 		}
 
-		// Send JSON response
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(messages)
 	}
 }
-
