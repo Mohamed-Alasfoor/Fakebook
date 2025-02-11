@@ -23,43 +23,10 @@ import {
 } from "@/components/ui/dialog";
 import { MessageCircle, Users, Calendar, Plus } from "lucide-react";
 import PostView from "@/components/groups/postView";
-
-interface Group {
-  id: string;
-  name: string;
-  description: string;
-  creator_id: string;
-  created_at: string;
-}
-
-interface Post {
-  id: string;
-  user_id: string;
-  content: string;
-  image_url?: string;
-  created_at: string;
-}
-interface Member {
-  id: string;
-  first_name: string;
-  last_name: string;
-  nickname?: string;
-  avatar?: string;
-}
-interface Event {
-  id: string;
-  group_id: string;
-  title: string;
-  description: string;
-  event_date: string;
-  creator_id: string;
-}
-
-interface RSVPStatus {
-  event_id: string;
-  user_id: string;
-  status: "going" | "not going" | null;
-}
+import PostsTab from "@/components/groups/PostsTab";
+import MembersTab from "@/components/groups/MembersTab";
+import EventsTab from "@/components/groups/EventsTab";
+import { Group, Post, Member, Event, RSVPStatus } from "@/types/groupTypes";
 
 export default function GroupView() {
   const params = useParams();
@@ -79,6 +46,7 @@ export default function GroupView() {
   const [eventDescription, setEventDescription] = useState("");
   const [eventDateTime, setEventDateTime] = useState("");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+
   useEffect(() => {
     if (!params?.id) return;
 
@@ -128,6 +96,7 @@ export default function GroupView() {
 
     fetchGroupData();
   }, [params?.id, router]);
+
   const handleCreatePost = async () => {
     if (!postContent.trim()) return alert("Post content cannot be empty.");
 
@@ -164,6 +133,7 @@ export default function GroupView() {
       alert("Error creating post.");
     }
   };
+
   // Fetch RSVP statuses for events
   useEffect(() => {
     if (events.length === 0) return;
@@ -231,6 +201,7 @@ export default function GroupView() {
       alert("Error creating event.");
     }
   };
+
   const handleRSVP = async (eventId: string, status: "going" | "not going") => {
     try {
       await axios.post(
@@ -254,8 +225,7 @@ export default function GroupView() {
       alert("Error updating RSVP.");
     }
   };
-  
-  
+
   if (isLoading)
     return (
       <div className="text-center py-10 text-gray-500">
@@ -313,215 +283,44 @@ export default function GroupView() {
 
               {/* Posts Tab */}
               <TabsContent value="posts" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Group Posts</h3>
-                  <Dialog
-                    open={isCreatingPost}
-                    onOpenChange={setIsCreatingPost}
-                  >
-                    <DialogTrigger asChild>
-                      <Button className="bg-[#6C5CE7] text-white flex items-center">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Create Post
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Create a Post</DialogTitle>
-                      </DialogHeader>
-                      <Textarea
-                        placeholder="What's on your mind?"
-                        value={postContent}
-                        onChange={(e) => setPostContent(e.target.value)}
-                      />
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) =>
-                          setPostFile(e.target.files?.[0] || null)
-                        }
-                      />
-                      <Button
-                        className="w-full mt-2 bg-[#6C5CE7] text-white"
-                        onClick={handleCreatePost}
-                      >
-                        Post
-                      </Button>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-
-                {selectedPost ? (
-                  <PostView
-                    post={selectedPost}
-                    onClose={() => setSelectedPost(null)}
-                  />
-                ) : posts.length === 0 ? (
-                  <p className="text-gray-500 text-center">No posts yet.</p>
-                ) : (
-                  posts.map((post) => (
-                    <Card
-                      key={post.id}
-                      className="border shadow-sm cursor-pointer"
-                      onClick={() => setSelectedPost(post)}
-                    >
-                      <CardContent className="p-4">
-                        <p className="text-sm text-gray-500">
-                          Posted on {new Date(post.created_at).toLocaleString()}
-                        </p>
-                        <p className="mt-2">{post.content}</p>
-                        {post.image_url && (
-                          <img
-                            src={`http://localhost:8080/uploads/${post.image_url}`}
-                            alt="Post Image"
-                            className="mt-2 rounded-md"
-                          />
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
+                <PostsTab
+                  posts={posts}
+                  selectedPost={selectedPost}
+                  setSelectedPost={setSelectedPost}
+                  isCreatingPost={isCreatingPost}
+                  setIsCreatingPost={setIsCreatingPost}
+                  postContent={postContent}
+                  setPostContent={setPostContent}
+                  postFile={postFile}
+                  setPostFile={setPostFile}
+                  handleCreatePost={handleCreatePost}
+                />
               </TabsContent>
 
               {/* Members Tab */}
               <TabsContent value="members">
-                <h3 className="text-lg font-semibold mb-4">Group Members</h3>
-                {isLoadingMembers ? (
-                  <p className="text-center text-gray-500">
-                    Loading members...
-                  </p>
-                ) : members.length === 0 ? (
-                  <p className="text-center text-gray-500">No members yet.</p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {members.map((member) => (
-                      <Card key={member.id} className="border shadow-sm">
-                        <CardContent className="p-4 flex items-center space-x-4">
-                          <div>
-                            <p className="font-semibold">
-                              {member.first_name} {member.last_name}
-                            </p>
-                            {member.nickname && (
-                              <p className="text-gray-500 text-sm">
-                                @{member.nickname}
-                              </p>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                <MembersTab
+                  members={members}
+                  isLoadingMembers={isLoadingMembers}
+                />
               </TabsContent>
 
               {/* Events Tab */}
               <TabsContent value="events">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">Group Events</h3>
-                  <Dialog
-                    open={isCreatingEvent}
-                    onOpenChange={setIsCreatingEvent}
-                  >
-                    <DialogTrigger asChild>
-                      <Button className="bg-[#6C5CE7] text-white flex items-center">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Create Event
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Create an Event</DialogTitle>
-                      </DialogHeader>
-                      <Input
-                        placeholder="Event Title"
-                        value={eventTitle}
-                        onChange={(e) => setEventTitle(e.target.value)}
-                      />
-                      <Textarea
-                        placeholder="Event Description"
-                        value={eventDescription}
-                        onChange={(e) => setEventDescription(e.target.value)}
-                      />
-                      <Input
-                        type="datetime-local"
-                        value={eventDateTime}
-                        onChange={(e) => setEventDateTime(e.target.value)}
-                      />
-                      <Button
-                        className="w-full mt-2 bg-[#6C5CE7] text-white"
-                        onClick={handleCreateEvent}
-                      >
-                        Create Event
-                      </Button>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-
-                {events.length === 0 ? (
-                  <p className="text-center text-gray-500">No events yet.</p>
-                ) : (
-                  <div className="grid gap-6">
-                    {events.map((event) => {
-                      const userRSVP = rsvps.find(
-                        (rsvp) => rsvp.event_id === event.id
-                      )?.status;
-
-                      return (
-                        <Card
-                          key={event.id}
-                          className="border shadow-lg rounded-lg overflow-hidden"
-                        >
-                          <CardContent className="p-6">
-                            <div className="flex justify-between items-center">
-                              <h4 className="text-xl font-bold text-[#6C5CE7]">
-                                {event.title}
-                              </h4>
-                              <p className="text-sm text-gray-500">
-                                {new Date(event.event_date).toLocaleString()}
-                              </p>
-                            </div>
-                            <p className="mt-2 text-gray-700">
-                              {event.description}
-                            </p>
-
-                            <div className="flex justify-between items-center mt-4">
-                              <div className="flex gap-2">
-                                <Button
-                                  className={`text-white ${
-                                    userRSVP === "going"
-                                      ? "bg-green-600"
-                                      : "bg-gray-300 hover:bg-green-500"
-                                  }`}
-                                  onClick={() => handleRSVP(event.id, "going")}
-                                >
-                                  ✅ Going
-                                </Button>
-                                <Button
-                                  className={`text-white ${
-                                    userRSVP === "not going"
-                                      ? "bg-red-600"
-                                      : "bg-gray-300 hover:bg-red-500"
-                                  }`}
-                                  onClick={() =>
-                                    handleRSVP(event.id, "not going")
-                                  }
-                                >
-                                  ❌ Not Going
-                                </Button>
-                              </div>
-                              <p className="text-sm text-gray-500">
-                                Your RSVP:{" "}
-                                <strong>
-                                  {userRSVP ? userRSVP.toUpperCase() : "None"}
-                                </strong>
-                              </p>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
+                <EventsTab
+                  events={events}
+                  rsvps={rsvps}
+                  isCreatingEvent={isCreatingEvent}
+                  setIsCreatingEvent={setIsCreatingEvent}
+                  eventTitle={eventTitle}
+                  setEventTitle={setEventTitle}
+                  eventDescription={eventDescription}
+                  setEventDescription={setEventDescription}
+                  eventDateTime={eventDateTime}
+                  setEventDateTime={setEventDateTime}
+                  handleCreateEvent={handleCreateEvent}
+                  handleRSVP={handleRSVP}
+                />
               </TabsContent>
             </Tabs>
           </CardContent>
