@@ -44,8 +44,8 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
   const menuItems = [
     { icon: Home, label: "Home", href: "/" },
     { icon: Users, label: "Groups", href: "/groups" },
-    { icon: MessageCircle, label: "Chats", href: "/chats" },
-    { icon: Bell, label: "Notifications", href: "/notifications" },
+    { icon: MessageCircle, label: "Chats", href: "/chat" },
+    // { icon: Bell, label: "Notifications", href: "/notifications" },
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 

@@ -155,7 +155,7 @@ func RSVPGroupEventHandler(db *sql.DB) http.HandlerFunc {
 					return
 			}
 
-			if rsvp.EventID == "" || (rsvp.Status != "going" && rsvp.Status != "not_going") {
+			if rsvp.EventID == "" || (rsvp.Status != "going" && rsvp.Status != "not going") {
 					http.Error(w, "Invalid RSVP status", http.StatusBadRequest)
 					return
 			}

@@ -60,7 +60,9 @@ export function GroupList({ groups, type, isLoading, refreshGroups, requestToJoi
       {groups.map((group) => (
         <Card key={group.id} className="border-2 border-slate-100 hover:border-[#6C5CE7] transition-colors">
           <CardHeader>
+            <Link href={`/groups/${group.id}`}>
               <CardTitle className="text-[#6C5CE7] hover:underline cursor-pointer">{group.name}</CardTitle>
+            </Link>
             <CardDescription>Created on {new Date(group.created_at).toLocaleDateString()}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

@@ -51,14 +51,14 @@ interface Event {
   group_id: string;
   title: string;
   description: string;
-  date_time: string;
+  event_date: string;
   creator_id: string;
 }
 
 interface RSVPStatus {
   event_id: string;
   user_id: string;
-  status: "going" | "not_going" | null;
+  status: "going" | "not going" | null;
 }
 
 export default function GroupView() {
@@ -78,30 +78,31 @@ export default function GroupView() {
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
   const [eventDateTime, setEventDateTime] = useState("");
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);  useEffect(() => {
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  useEffect(() => {
     if (!params?.id) return;
 
     const fetchGroupData = async () => {
       try {
         const groupId = params.id as string;
-        const [groupResponse, postsResponse, membersResponse] =
+        const [groupResponse, postsResponse, membersResponse, eventsResponse] =
           await Promise.all([
-            axios
-              .get(
-                `http://localhost:8080/groups/{group_id}?group_id=${groupId}`,
-                { withCredentials: true }
-              )
-              .catch(() => null),
-            axios
-              .get(`http://localhost:8080/groups/posts?group_id=${groupId}`, {
-                withCredentials: true,
-              })
-              .catch(() => null),
-            axios
-              .get(`http://localhost:8080/groups/members?group_id=${groupId}`, {
-                withCredentials: true,
-              })
-              .catch(() => null),
+            axios.get(
+              `http://localhost:8080/groups/{group_id}?group_id=${groupId}`,
+              { withCredentials: true }
+            ),
+            axios.get(
+              `http://localhost:8080/groups/posts?group_id=${groupId}`,
+              { withCredentials: true }
+            ),
+            axios.get(
+              `http://localhost:8080/groups/members?group_id=${groupId}`,
+              { withCredentials: true }
+            ),
+            axios.get(
+              `http://localhost:8080/groups/events?group_id=${groupId}`,
+              { withCredentials: true }
+            ),
           ]);
 
         if (
@@ -115,6 +116,7 @@ export default function GroupView() {
         setGroup(groupResponse.data);
         setPosts(postsResponse?.data || []);
         setMembers(membersResponse?.data || []);
+        setEvents(eventsResponse?.data || []);
       } catch (error) {
         console.error("Error fetching group data:", error);
         router.push("/groups");
@@ -204,7 +206,7 @@ export default function GroupView() {
           group_id: params.id,
           title: eventTitle,
           description: eventDescription,
-          date_time: eventDateTime,
+          event_date: eventDateTime,
         },
         { withCredentials: true }
       );
@@ -215,7 +217,7 @@ export default function GroupView() {
           group_id: params.id as string,
           title: eventTitle,
           description: eventDescription,
-          date_time: eventDateTime,
+          event_date: eventDateTime,
           creator_id: "me",
         },
         ...events,
@@ -229,20 +231,31 @@ export default function GroupView() {
       alert("Error creating event.");
     }
   };
-
-  // RSVP to an event
-  const handleRSVP = async (eventId: string, status: "going" | "not_going") => {
+  const handleRSVP = async (eventId: string, status: "going" | "not going") => {
     try {
       await axios.post(
         "http://localhost:8080/groups/events/rsvp",
         { event_id: eventId, status },
         { withCredentials: true }
       );
-      setRsvps([...rsvps, { event_id: eventId, user_id: "me", status }]);
+  
+      // ✅ Update RSVP state
+      setRsvps((prev) => {
+        const existingRSVP = prev.find((rsvp) => rsvp.event_id === eventId);
+        if (existingRSVP) {
+          return prev.map((rsvp) =>
+            rsvp.event_id === eventId ? { ...rsvp, status } : rsvp
+          );
+        }
+        return [...prev, { event_id: eventId, user_id: "me", status }];
+      });
     } catch (error) {
       console.error("Failed to RSVP:", error);
+      alert("Error updating RSVP.");
     }
   };
+  
+  
   if (isLoading)
     return (
       <div className="text-center py-10 text-gray-500">
@@ -253,7 +266,7 @@ export default function GroupView() {
     return (
       <div className="text-center py-10 text-red-500">Group not found.</div>
     );
-  
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -444,30 +457,71 @@ export default function GroupView() {
                   </Dialog>
                 </div>
 
-                {events.map((event) => (
-                  <Card key={event.id} className="border shadow-sm mb-4">
-                    <CardContent className="p-4">
-                      <p className="text-lg font-semibold">{event.title}</p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(event.date_time).toLocaleString()}
-                      </p>
-                      <p className="mt-2">{event.description}</p>
-                      <Button
-                        className="mr-2 mt-2"
-                        onClick={() => handleRSVP(event.id, "going")}
-                      >
-                        Going
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        className="mt-2"
-                        onClick={() => handleRSVP(event.id, "not_going")}
-                      >
-                        Not Going
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+                {events.length === 0 ? (
+                  <p className="text-center text-gray-500">No events yet.</p>
+                ) : (
+                  <div className="grid gap-6">
+                    {events.map((event) => {
+                      const userRSVP = rsvps.find(
+                        (rsvp) => rsvp.event_id === event.id
+                      )?.status;
+
+                      return (
+                        <Card
+                          key={event.id}
+                          className="border shadow-lg rounded-lg overflow-hidden"
+                        >
+                          <CardContent className="p-6">
+                            <div className="flex justify-between items-center">
+                              <h4 className="text-xl font-bold text-[#6C5CE7]">
+                                {event.title}
+                              </h4>
+                              <p className="text-sm text-gray-500">
+                                {new Date(event.event_date).toLocaleString()}
+                              </p>
+                            </div>
+                            <p className="mt-2 text-gray-700">
+                              {event.description}
+                            </p>
+
+                            <div className="flex justify-between items-center mt-4">
+                              <div className="flex gap-2">
+                                <Button
+                                  className={`text-white ${
+                                    userRSVP === "going"
+                                      ? "bg-green-600"
+                                      : "bg-gray-300 hover:bg-green-500"
+                                  }`}
+                                  onClick={() => handleRSVP(event.id, "going")}
+                                >
+                                  ✅ Going
+                                </Button>
+                                <Button
+                                  className={`text-white ${
+                                    userRSVP === "not going"
+                                      ? "bg-red-600"
+                                      : "bg-gray-300 hover:bg-red-500"
+                                  }`}
+                                  onClick={() =>
+                                    handleRSVP(event.id, "not going")
+                                  }
+                                >
+                                  ❌ Not Going
+                                </Button>
+                              </div>
+                              <p className="text-sm text-gray-500">
+                                Your RSVP:{" "}
+                                <strong>
+                                  {userRSVP ? userRSVP.toUpperCase() : "None"}
+                                </strong>
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </CardContent>
