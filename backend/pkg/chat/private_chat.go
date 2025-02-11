@@ -13,6 +13,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// -----------------------------
+// Data Structures and Handlers
+// -----------------------------
+
 // PrivateMessage represents a private chat message.
 type PrivateMessage struct {
 	ID         string `json:"id"`
@@ -78,7 +82,7 @@ func GetPrivateChatHistoryHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// ChatMessage represents the structure for private chat messages.
+// ChatMessage represents the structure for private chat messages (used over WebSocket).
 type ChatMessage struct {
 	ID         string `json:"id"`
 	SenderID   string `json:"sender_id"`
@@ -89,12 +93,21 @@ type ChatMessage struct {
 	CreatedAt string `json:"created_at"`
 }
 
+// -----------------------------
+// WebSocket Upgrade and Tracking
+// -----------------------------
+
 var upgrader = websocket.Upgrader{
 	// Allow connections from any origin (adjust as needed for production)
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
 }
+
+
+// -----------------------------
+// WebSocket Chat Handler with Persistent Status
+// -----------------------------
 
 // PrivateChatHandler handles the private chat WebSocket connection.
 func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
@@ -114,16 +127,22 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Add the connection to the online tracker.
+		// Add the connection to the in-memory tracker.
 		AddClient(userID, conn)
 		log.Printf("User %s connected to private chat", userID)
-		// (Optional) Update user_status in the database here as "online".
 
-		// Ensure the user is removed from the tracker on disconnect.
+		// Update persistent status to "online".
+		if err := MarkUserOnline(db, userID); err != nil {
+			log.Println("Failed to mark user online:", err)
+		}
+
+		// Ensure that when the connection closes, we mark the user offline.
 		defer func() {
 			RemoveClient(userID)
 			log.Printf("User %s disconnected from private chat", userID)
-			// (Optional) Update user_status in the database as "offline" with last seen timestamp.
+			if err := MarkUserOffline(db, userID); err != nil {
+				log.Println("Failed to mark user offline:", err)
+			}
 		}()
 
 		// Main loop: read and process messages.
@@ -136,6 +155,7 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 			if msgType != websocket.TextMessage {
 				continue
 			}
+
 			var msg ChatMessage
 			if err := json.Unmarshal(msgBytes, &msg); err != nil {
 				log.Println("JSON unmarshal error:", err)
@@ -162,7 +182,6 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 			}
 
 			// For regular messages, first verify that private messaging is allowed.
-			// (At least one of the users must be following the other.)
 			var allowed bool
 			checkQuery := `
                 SELECT EXISTS(
@@ -196,6 +215,9 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+// -----------------------------
+// Mark Message as Read Handler
+// -----------------------------
 
 // MarkMessageReadRequest represents the expected JSON payload.
 type MarkMessageReadRequest struct {
