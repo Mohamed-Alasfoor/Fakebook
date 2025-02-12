@@ -1,12 +1,11 @@
 import useSWR from "swr";
 
-const API_URL = "http://localhost:8080"; // Adjust this if needed
+const API_URL = "http://localhost:8080"; // Change this if your backend lives elsewhere
 
-// An improved fetcher that checks for HTTP errors
+// A fetcher that checks for HTTP errors and returns JSON data
 const fetcher = async (url: string) => {
   const res = await fetch(url);
   if (!res.ok) {
-    // Try to parse the error message from the response
     const errorInfo = await res.text();
     throw new Error(`Error ${res.status}: ${res.statusText}. ${errorInfo}`);
   }
@@ -20,7 +19,7 @@ export function useSearch(query: string) {
   );
 
   return {
-    searchResults: data, // Expected format: { users: [...], groups: [...] }
+    searchResults: data, // Expected to be of the form { users: [...], groups: [...] }
     isLoading: !error && !data && query !== "",
     isError: error,
   };

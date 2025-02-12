@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus, Menu } from "lucide-react";
@@ -7,7 +8,7 @@ import PostsList from "@/components/home/posts/postList";
 import { PostView } from "@/components/home/posts/postView";
 import { usePosts } from "@/lib/hooks/swr/getPosts";
 import { Post } from "@/types/post";
-import { useSearch } from "@/lib/hooks/useSearch"; // Import the search hook
+import { useSearch } from "@/lib/hooks/useSearch";
 
 interface MainContentProps {
   onOpenSidebar: () => void;
@@ -18,7 +19,7 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
 
-  // State for the search query.
+  // State to store the search query
   const [searchQuery, setSearchQuery] = useState("");
   const {
     searchResults,
@@ -53,12 +54,14 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
         </Button>
       </div>
 
-      {/* Display Search Results if a query exists; otherwise, show posts */}
+      {/* If a search query exists, display search results; otherwise, show posts or selected post */}
       {searchQuery ? (
         <div>
           {isSearchLoading && <p>Loading search results...</p>}
           {isSearchError && (
-            <p>Error loading search results: {isSearchError.message}</p>
+            <p className="text-red-600">
+              Error loading search results: {isSearchError.message}
+            </p>
           )}
           {searchResults && (
             <>
@@ -66,15 +69,30 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
               <ul>
                 {searchResults.users?.map((user: any) => (
                   <li key={user.id} className="p-2 border-b">
-                    {user.nickname}
+                    <Link
+                      href={`/profile/${user.id}`}
+                      className="flex items-center gap-4 hover:bg-gray-100 p-2"
+                    >
+                      <span className="text-base font-medium">
+                        {user.nickname}
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>
+
               <h3 className="font-bold mt-4">Groups</h3>
               <ul>
                 {searchResults.groups?.map((group: any) => (
                   <li key={group.id} className="p-2 border-b">
-                    {group.name}
+                    <Link
+                      href={`/groups/${group.id}`}
+                      className="flex items-center gap-4 hover:bg-gray-100 p-2"
+                    >
+                      <span className="text-base font-medium">
+                        {group.name}
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>
