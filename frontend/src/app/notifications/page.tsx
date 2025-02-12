@@ -25,7 +25,7 @@ interface Notification {
 
 export default function CrazyNotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [flash, setFlash] = useState(false); // For a quick background flash
+  const [flash, setFlash] = useState(false); 
 
   // 1) Fetch notifications from the Go backend
   useEffect(() => {
@@ -110,7 +110,7 @@ export default function CrazyNotificationsPage() {
       }}
     >
       <Typography variant="h3" sx={{ fontWeight: "bold", mb: 2, color: "#2f2e41" }}>
-        CRAZY NOTIFICATIONS!
+       NOTIFICATIONS!
       </Typography>
 
       <Button
