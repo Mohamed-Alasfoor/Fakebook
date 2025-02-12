@@ -840,6 +840,13 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		//word count limit
+		words := strings.Fields(content)
+		if len(words) > 250 {
+			http.Error(w, "Content cannot exceed 250 words", http.StatusBadRequest)
+		return
+	}
+
 		// Ensure "uploads" directory exists
 		uploadDir := "uploads"
 		if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
@@ -1081,6 +1088,13 @@ func CreateGroupPostCommentHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Post ID and content are required", http.StatusBadRequest)
 			return
 		}
+
+		//word count limit
+		words := strings.Fields(request.Content)
+		if len(words) > 200 {
+			http.Error(w, "Content cannot exceed 200 words", http.StatusBadRequest)
+		return
+	}
 
 		// Insert into database
 		commentID := uuid.New().String()

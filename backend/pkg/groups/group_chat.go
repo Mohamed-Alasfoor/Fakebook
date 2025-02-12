@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 
-	"github.com/gorilla/websocket"
-	"github.com/google/uuid"
 	"social-network/pkg/sessions"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 // Client holds connection-specific data.
@@ -97,6 +99,15 @@ func GroupChatHandler(db *sql.DB) http.HandlerFunc {
 			// Override the fields to ensure data integrity.
 			msg.SenderID = userID
 			msg.GroupID = groupID
+
+			//Enforce a word limit on the message 
+			words := strings.Fields(msg.Message)
+			if len(words) > 200 {
+				errorMsg := map[string]string{"error": "Message cannot exceed 200 words"}
+				errorBytes, _ := json.Marshal(errorMsg)
+				conn.WriteMessage(websocket.TextMessage, errorBytes)
+				continue
+			}
 
 			// Query the database to get the sender's nickname and avatar.
 			err = db.QueryRow(`SELECT nickname, avatar FROM users WHERE id = ?`, userID).Scan(&msg.Nickname, &msg.Avatar)

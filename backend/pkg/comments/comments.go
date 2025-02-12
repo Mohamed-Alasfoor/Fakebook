@@ -55,6 +55,13 @@ func AddCommentHandler(db *sql.DB) http.HandlerFunc {
             return
         }
 
+				//word count limit
+				words := strings.Fields(content)
+	    	if len(words) > 200 {
+		    	http.Error(w, "Content cannot exceed 200 words", http.StatusBadRequest)
+		  	return
+		  }
+
         // Handle file upload (optional)
         var imageURL string
         file, fileHeader, err := r.FormFile("file")

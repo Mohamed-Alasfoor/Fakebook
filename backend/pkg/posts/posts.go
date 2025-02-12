@@ -61,6 +61,13 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
             return
         }
 
+      //word count limit
+		   words := strings.Fields(content)
+	    	if len(words) > 250 {
+		    	http.Error(w, "Content cannot exceed 250 words", http.StatusBadRequest)
+		  	return
+		  }
+
         if privacy == "" {
             privacy = "public"
         } else if privacy != "public" && privacy != "almost_private" && privacy != "private" {
@@ -147,13 +154,6 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
         json.NewEncoder(w).Encode(response)
     }
 }
-
-
-
-
-
-
-
 
 
 // Helper function to check if a slice contains a string
