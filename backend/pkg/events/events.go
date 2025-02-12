@@ -93,43 +93,71 @@ func CreateGroupEventHandler(db *sql.DB) http.HandlerFunc {
  // Fetch Events in a Group
  func GetGroupEventsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodGet {
-					http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-					return
-			}
+		// Ensure the request method is GET.
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
 
-			groupID := r.URL.Query().Get("group_id")
-			if groupID == "" {
-					http.Error(w, "Missing group_id", http.StatusBadRequest)
-					return
-			}
+		// Retrieve the current user's ID from the session.
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 
-			rows, err := db.Query(`
-					SELECT id, group_id, title, description, event_date
-					FROM events WHERE group_id = ? ORDER BY event_date ASC`, groupID)
-			if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-			}
-			defer rows.Close()
+		// Extract the group ID from query parameters.
+		groupID := r.URL.Query().Get("group_id")
+		if groupID == "" {
+			http.Error(w, "Missing group_id", http.StatusBadRequest)
+			return
+		}
 
-			var events []map[string]string
-			for rows.Next() {
-					var id, groupID, title, description, event_date string
-					if err := rows.Scan(&id, &groupID, &title, &description, &event_date); err != nil {
-							http.Error(w, "Failed to parse events", http.StatusInternalServerError)
-							return
-					}
-					event := map[string]string{
-							"id": id, "group_id": groupID, "title": title, "description": description, "event_date": event_date,
-					}
-					events = append(events, event)
-			}
+		// Query the events and join with event_rsvp to get the current user's RSVP status.
+		// If the user has not responded, COALESCE returns 'none'.
+		rows, err := db.Query(`
+			SELECT 
+				e.id, 
+				e.group_id, 
+				e.title, 
+				e.description, 
+				e.event_date,
+				COALESCE(r.status, 'none') as user_status
+			FROM events e
+			LEFT JOIN event_rsvp r ON e.id = r.event_id AND r.user_id = ?
+			WHERE e.group_id = ?
+			ORDER BY e.event_date ASC
+		`, userID, groupID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
 
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(events)
+		// Build a slice of events with RSVP status.
+		var events []map[string]string
+		for rows.Next() {
+			var id, groupID, title, description, eventDate, userStatus string
+			if err := rows.Scan(&id, &groupID, &title, &description, &eventDate, &userStatus); err != nil {
+				http.Error(w, "Failed to parse events", http.StatusInternalServerError)
+				return
+			}
+			event := map[string]string{
+				"id":           id,
+				"group_id":     groupID,
+				"title":        title,
+				"description":  description,
+				"event_date":   eventDate,
+				"user_status":  userStatus, // The RSVP status for the current user.
+			}
+			events = append(events, event)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(events)
 	}
 }
+
 
 //allows users to respond to events in a group
 func RSVPGroupEventHandler(db *sql.DB) http.HandlerFunc {
