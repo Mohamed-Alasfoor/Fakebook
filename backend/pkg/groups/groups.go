@@ -967,61 +967,80 @@ func DeleteGroupPostHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
-
-
 // GetGroupPostsHandler fetches all posts from a specific group
 func GetGroupPostsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Ensure the request method is GET.
 		if r.Method != http.MethodGet {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
 
-		// Get user ID from session
+		// Retrieve the user ID from the session.
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		// Extract group ID from query params
+		// Extract the group ID from query parameters.
 		groupID := r.URL.Query().Get("group_id")
 		if groupID == "" {
 			http.Error(w, "Missing group_id", http.StatusBadRequest)
 			return
 		}
 
-		// Check if the user is a member of the group
+		// Verify that the user is a member of the group.
 		var isMember bool
-		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
+		err = db.QueryRow(`
+			SELECT EXISTS(
+				SELECT 1 FROM group_membership 
+				WHERE group_id = ? AND user_id = ? AND status = 'member'
+			)
+		`, groupID, userID).Scan(&isMember)
 		if err != nil || !isMember {
 			http.Error(w, "Forbidden: You are not a member of this group", http.StatusForbidden)
 			return
 		}
 
-		// Fetch all posts from the group
-		rows, err := db.Query(`SELECT id, user_id, content, image_url, created_at FROM group_posts WHERE group_id = ? ORDER BY created_at DESC`, groupID)
+		// Fetch all posts from the group, joining with the users table
+		// to retrieve the creator's nickname and avatar.
+		rows, err := db.Query(`
+			SELECT 
+				gp.id, 
+				gp.user_id, 
+				gp.content, 
+				gp.image_url, 
+				gp.created_at, 
+				u.nickname, 
+				u.avatar
+			FROM group_posts gp
+			JOIN users u ON gp.user_id = u.id
+			WHERE gp.group_id = ?
+			ORDER BY gp.created_at DESC
+		`, groupID)
 		if err != nil {
 			http.Error(w, "Failed to fetch group posts", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
+		// Prepare a slice to hold the posts.
 		var posts []map[string]string
 		for rows.Next() {
-			var post map[string]string
-			var id, userID, content, imageURL, createdAt string
-			if err := rows.Scan(&id, &userID, &content, &imageURL, &createdAt); err != nil {
+			var id, creatorID, content, imageURL, createdAt, nickname, avatar string
+			if err := rows.Scan(&id, &creatorID, &content, &imageURL, &createdAt, &nickname, &avatar); err != nil {
 				http.Error(w, "Failed to parse posts", http.StatusInternalServerError)
 				return
 			}
-			post = map[string]string{
+			post := map[string]string{
 				"id":         id,
-				"user_id":    userID,
+				"user_id":    creatorID,
 				"content":    content,
 				"image_url":  imageURL,
 				"created_at": createdAt,
+				"nickname":   nickname,
+				"avatar":     avatar,
 			}
 			posts = append(posts, post)
 		}
@@ -1030,6 +1049,7 @@ func GetGroupPostsHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(posts)
 	}
 }
+
 
 
 // CreateGroupPostCommentHandler allows users to add comments to group posts
