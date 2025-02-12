@@ -43,7 +43,7 @@ export default function ChatTab({
 
       {/* Messages List - Flexible Height */}
       <ScrollArea className="flex-grow px-4 py-2 overflow-y-auto">
-        {messages.length === 0 ? (
+        {messages===null ? (
           <p className="text-center text-gray-500 mt-4">No messages yet.</p>
         ) : (
           messages.map((msg, index) => {
