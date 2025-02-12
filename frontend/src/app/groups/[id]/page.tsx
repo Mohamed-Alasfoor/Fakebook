@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -13,40 +13,55 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { MessageCircle, Users, Calendar, Plus } from "lucide-react";
-import PostView from "@/components/groups/postView";
+import { MessageCircle, Users, Calendar, Send } from "lucide-react";
 import PostsTab from "@/components/groups/PostsTab";
 import MembersTab from "@/components/groups/MembersTab";
 import EventsTab from "@/components/groups/EventsTab";
 import { Group, Post, Member, Event, RSVPStatus } from "@/types/groupTypes";
+import { useWebSocket } from "@/lib/hooks/use-web-socket";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import ChatTab from "@/components/groups/ChatTab";
+import Cookies from "js-cookie";
+
+
+interface ChatMessage {
+  sender_id: string;
+  message: string;
+  created_at: string;
+}
 
 export default function GroupView() {
   const params = useParams();
   const router = useRouter();
+
   const [group, setGroup] = useState<Group | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [rsvps, setRsvps] = useState<RSVPStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [postContent, setPostContent] = useState("");
   const [postFile, setPostFile] = useState<File | null>(null);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [rsvps, setRsvps] = useState<RSVPStatus[]>([]);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
   const [eventDateTime, setEventDateTime] = useState("");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
+  // --- Chat States & Refs ---
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+
+  // --- WebSocket hook ---
+  const { socket, isConnected, sendMessage } = useWebSocket(
+    `ws://localhost:8080/groups/chat?group_id=${params.id}`
+  );
+
+  // --- Fetch Group Data ---
   useEffect(() => {
     if (!params?.id) return;
 
@@ -73,10 +88,7 @@ export default function GroupView() {
             ),
           ]);
 
-        if (
-          !groupResponse?.data ||
-          Object.keys(groupResponse.data).length === 0
-        ) {
+        if (!groupResponse?.data || Object.keys(groupResponse.data).length === 0) {
           router.push("/groups");
           return;
         }
@@ -97,6 +109,7 @@ export default function GroupView() {
     fetchGroupData();
   }, [params?.id, router]);
 
+  // --- Create Post ---
   const handleCreatePost = async () => {
     if (!postContent.trim()) return alert("Post content cannot be empty.");
 
@@ -134,7 +147,7 @@ export default function GroupView() {
     }
   };
 
-  // Fetch RSVP statuses for events
+  // --- Fetch RSVPs for events ---
   useEffect(() => {
     if (events.length === 0) return;
 
@@ -163,7 +176,7 @@ export default function GroupView() {
     fetchRSVPs();
   }, [events]);
 
-  // Create a new event
+  // --- Create Event ---
   const handleCreateEvent = async () => {
     if (!eventTitle.trim() || !eventDescription.trim() || !eventDateTime) {
       return alert("All fields are required.");
@@ -202,6 +215,7 @@ export default function GroupView() {
     }
   };
 
+  // --- RSVP Handler ---
   const handleRSVP = async (eventId: string, status: "going" | "not going") => {
     try {
       await axios.post(
@@ -209,8 +223,7 @@ export default function GroupView() {
         { event_id: eventId, status },
         { withCredentials: true }
       );
-  
-      // ✅ Update RSVP state
+
       setRsvps((prev) => {
         const existingRSVP = prev.find((rsvp) => rsvp.event_id === eventId);
         if (existingRSVP) {
@@ -223,6 +236,50 @@ export default function GroupView() {
     } catch (error) {
       console.error("Failed to RSVP:", error);
       alert("Error updating RSVP.");
+    }
+  };
+
+  // --- Fetch Previous Chat Messages ---
+  useEffect(() => {
+    if (!params?.id) return;
+
+    const fetchMessages = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:8080/groups/chat/messages?group_id=${params.id}`,
+          { withCredentials: true }
+        );
+        setMessages(response.data);
+      } catch (error) {
+        console.error("Error fetching previous chat messages:", error);
+      }
+    };
+
+    fetchMessages();
+  }, [params?.id]);
+
+  // --- Listen for Incoming WebSocket Messages ---
+  useEffect(() => {
+    if (socket) {
+      socket.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        setMessages((prevMessages) => [...prevMessages, message]);
+      };
+    }
+  }, [socket]);
+
+  // --- Auto-scroll when messages update ---
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  // --- Send Message Handler ---
+  const handleSendMessage = () => {
+    if (newMessage.trim() && isConnected) {
+      sendMessage(JSON.stringify({ message: newMessage }));
+      setNewMessage("");
     }
   };
 
@@ -299,10 +356,7 @@ export default function GroupView() {
 
               {/* Members Tab */}
               <TabsContent value="members">
-                <MembersTab
-                  members={members}
-                  isLoadingMembers={isLoadingMembers}
-                />
+                <MembersTab members={members} isLoadingMembers={isLoadingMembers} />
               </TabsContent>
 
               {/* Events Tab */}
@@ -321,6 +375,17 @@ export default function GroupView() {
                   handleCreateEvent={handleCreateEvent}
                   handleRSVP={handleRSVP}
                 />
+              </TabsContent>
+
+              {/* Chat Tab */}
+              <TabsContent value="chat" className="p-0">
+                <ChatTab
+                  messages={messages}
+                  newMessage={newMessage}
+                  setNewMessage={setNewMessage}
+                  handleSendMessage={handleSendMessage}
+                  currentUserId= {Cookies.get("user_id")}
+                /> 
               </TabsContent>
             </Tabs>
           </CardContent>
