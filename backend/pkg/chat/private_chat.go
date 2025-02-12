@@ -235,6 +235,7 @@ type MarkMessageReadRequest struct {
 }
 
 // MarkMessageReadHandler marks a private chat message as read using a PUT request.
+// It prevents marking the same message as read more than once.
 func MarkMessageReadHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Ensure the request method is PUT.
@@ -255,8 +256,24 @@ func MarkMessageReadHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Update the read status to 1 in the database.
-		result, err := db.Exec(`UPDATE private_chat_messages SET "read" = 1 WHERE id = ?`, req.MessageID)
+		// First, check if the message exists and whether it has already been read.
+		var alreadyRead bool
+		err := db.QueryRow(`SELECT "read" FROM private_chat_messages WHERE id = ?`, req.MessageID).Scan(&alreadyRead)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Message not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
+		if alreadyRead {
+			http.Error(w, "Message already seen", http.StatusBadRequest)
+			return
+		}
+
+		// Update the read status to 1 in the database only if it hasn't been marked as read yet.
+		result, err := db.Exec(`UPDATE private_chat_messages SET "read" = 1 WHERE id = ? AND "read" = 0`, req.MessageID)
 		if err != nil {
 			http.Error(w, "Failed to mark message as read", http.StatusInternalServerError)
 			return
@@ -266,9 +283,13 @@ func MarkMessageReadHandler(db *sql.DB) http.HandlerFunc {
 		if err != nil {
 			log.Println("Error getting rows affected:", err)
 		} else if rowsAffected == 0 {
-			log.Printf("No rows updated. Message ID %s might not exist.", req.MessageID)
+			// This case should not occur since we already checked the status,
+			// but it’s a safeguard in case of a race condition.
+			http.Error(w, "Message already seen", http.StatusBadRequest)
+			return
 		}
 
 		w.Write([]byte("Message marked as read"))
 	}
 }
+
