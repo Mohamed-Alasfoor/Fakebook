@@ -14,6 +14,7 @@ import (
 	"social-network/pkg/middleware"
 	"social-network/pkg/notifications"
 	"social-network/pkg/posts"
+	"social-network/pkg/search"
 	"social-network/pkg/sessions"
 	"social-network/pkg/users"
 )
@@ -118,7 +119,7 @@ mux.HandleFunc("/chat/history", chat.GetPrivateChatHistoryHandler(db))
 mux.HandleFunc("/chat/online_persistent", chat.GetPersistentOnlineUsersHandler(db))
 mux.HandleFunc("/markread", chat.MarkMessageReadHandler(db))
 
-
+mux.Handle("/search", search.SearchHandler(db))
 
 
 
