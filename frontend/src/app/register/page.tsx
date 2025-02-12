@@ -18,7 +18,7 @@ import { AuthLayout } from "@/components/auth/auth-layout";
 import { PasswordInput } from "@/components/auth/password";
 import { LoginButtons } from "@/components/auth/login-buttons";
 import axios from "axios";
-import { useRouter } from "next/navigation"; // For pages directory; for app router, import from "next/navigation"
+import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -36,7 +36,7 @@ export default function RegisterPage() {
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setAvatar(file); // Store file in state
+      setAvatar(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setAvatarPreview(reader.result as string);
@@ -60,19 +60,26 @@ export default function RegisterPage() {
       formData.append("date_of_birth", dateOfBirth);
 
       if (avatar) {
-        formData.append("avatar", avatar); // Append actual file
+        formData.append("avatar", avatar);
       }
 
-      const res = await axios.post("http://localhost:8080/register", formData, {
+      // Send registration data to the backend
+      await axios.post("http://localhost:8080/register", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-        withCredentials: true, // This ensures cookies are sent/received if needed.
+        withCredentials: true, // Ensures cookies are sent/received
       });
 
-      // Optionally, store the returned user_id/session info if needed.
-      // Then, automatically redirect to the chat page.
-      router.push("/"); // Adjust the route as needed.
+      // Immediately login using the same email and password
+      await axios.post(
+        "http://localhost:8080/login",
+        { identifier: email, password },
+        { withCredentials: true }
+      );
+
+      // Redirect to the home page after successful login
+      router.push("/");
     } catch (err: any) {
       console.error(err);
       alert(
