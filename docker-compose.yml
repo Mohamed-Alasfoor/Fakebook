@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    container_name: backend-container
+    ports:
+      - "8080:8080"
+    networks:
+      - my-network
+    restart: always
+
+  frontend:
+    build: ./frontend
+    container_name: frontend-container
+    ports:
+      - "3000:3000"
+    networks:
+      - my-network
+    depends_on:
+      - backend
+    restart: always
+
+networks:
+  my-network:
+    driver: bridge
