@@ -3,15 +3,16 @@ package groups
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
-	"social-network/pkg/sessions"
-	"github.com/google/uuid"
 	"os"
 	"path/filepath"
-	"io"
-	"strings"
 	"social-network/pkg/notifications"
-	"fmt"
+	"social-network/pkg/sessions"
+	"strings"
+
+	"github.com/google/uuid"
 )
 
 type Group struct {
@@ -71,12 +72,12 @@ func GetAllGroupsHandler(db *sql.DB) http.HandlerFunc {
 
 			// Append group with user status to the response
 			group := map[string]interface{}{
-				"id":           groupID,
-				"name":         name,
-				"description":  description,
-				"creator_id":   creatorID,
-				"created_at":   createdAt,
-				"user_status":  userStatus, // Status like "member", "pending_request", etc.
+				"id":          groupID,
+				"name":        name,
+				"description": description,
+				"creator_id":  creatorID,
+				"created_at":  createdAt,
+				"user_status": userStatus, // Status like "member", "pending_request", etc.
 			}
 			groups = append(groups, group)
 		}
@@ -87,64 +88,64 @@ func GetAllGroupsHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-//Fetches details of a specific group
+// Fetches details of a specific group
 func GetGroupDetailsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodGet {
-					http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-					return
-			}
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
 
-			userID, err := sessions.GetUserIDFromSession(r)
-			if err != nil {
-					http.Error(w, "Unauthorized", http.StatusUnauthorized)
-					return
-			}
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 
-			groupID := r.URL.Query().Get("group_id")
-			if groupID == "" {
-					http.Error(w, "Missing group_id", http.StatusBadRequest)
-					return
-			}
+		groupID := r.URL.Query().Get("group_id")
+		if groupID == "" {
+			http.Error(w, "Missing group_id", http.StatusBadRequest)
+			return
+		}
 
-			var groupName, groupDescription, createdAt string
-			err = db.QueryRow(`SELECT name, description, created_at FROM groups WHERE id = ?`, groupID).Scan(&groupName, &groupDescription, &createdAt)
-			if err == sql.ErrNoRows {
-					http.Error(w, "Group not found", http.StatusNotFound)
-					return
-			} else if err != nil {
-					http.Error(w, "Failed to fetch group details", http.StatusInternalServerError)
-					return
-			}
+		var groupName, groupDescription, createdAt string
+		err = db.QueryRow(`SELECT name, description, created_at FROM groups WHERE id = ?`, groupID).Scan(&groupName, &groupDescription, &createdAt)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Group not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			http.Error(w, "Failed to fetch group details", http.StatusInternalServerError)
+			return
+		}
 
-			// Check if user is a member
-			var isMember bool
-			err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
+		// Check if user is a member
+		var isMember bool
+		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
 
-			if err != nil || !isMember {
-					// Non-members can only see limited info
-					json.NewEncoder(w).Encode(map[string]string{
-							"group_id":    groupID,
-							"name":        groupName,
-							"description": groupDescription,
-							"created_at":  createdAt,
-							"message":     "Join this group to see more details.",
-					})
-					return
-			}
-
-			// Members can see full details
+		if err != nil || !isMember {
+			// Non-members can only see limited info
 			json.NewEncoder(w).Encode(map[string]string{
-					"group_id":    groupID,
-					"name":        groupName,
-					"description": groupDescription,
-					"created_at":  createdAt,
-					"status":      "member",
+				"group_id":    groupID,
+				"name":        groupName,
+				"description": groupDescription,
+				"created_at":  createdAt,
+				"message":     "Join this group to see more details.",
 			})
+			return
+		}
+
+		// Members can see full details
+		json.NewEncoder(w).Encode(map[string]string{
+			"group_id":    groupID,
+			"name":        groupName,
+			"description": groupDescription,
+			"created_at":  createdAt,
+			"status":      "member",
+		})
 	}
 }
 
-//Allows users to search for groups by name
+// Allows users to search for groups by name
 func SearchGroupsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -180,8 +181,6 @@ func SearchGroupsHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
-
 // CreateGroupHandler allows a user to create a new group
 func CreateGroupHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -205,42 +204,42 @@ func CreateGroupHandler(db *sql.DB) http.HandlerFunc {
 		group.ID = uuid.New().String()
 		group.CreatorID = userID // Corrected field name
 
-		        // Start a transaction
-						tx, err := db.Begin()
-						if err != nil {
-								http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
-								return
-						}
-		
-						// Insert group into the database
-						_, err = tx.Exec(`INSERT INTO groups (id, name, description, creator_id) VALUES (?, ?, ?, ?)`,
-								group.ID, group.Name, group.Description, group.CreatorID)
-						if err != nil {
-								tx.Rollback()
-								http.Error(w, "Failed to create group", http.StatusInternalServerError)
-								return
-						}
-		
-						// Insert creator into group_membership as 'member'
-						_, err = tx.Exec(`INSERT INTO group_membership (id, group_id, user_id, status) VALUES (?, ?, ?, 'member')`,
-								uuid.New().String(), group.ID, group.CreatorID)
-						if err != nil {
-								tx.Rollback()
-								http.Error(w, "Failed to add creator to group membership", http.StatusInternalServerError)
-								return
-						}
-		
-						// Commit transaction
-						if err := tx.Commit(); err != nil {
-								http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
-								return
-						}
-		
-						// Return success response
-						w.WriteHeader(http.StatusCreated)
-						json.NewEncoder(w).Encode(map[string]string{"message": "Group created successfully", "group_id": group.ID})
-				}
+		// Start a transaction
+		tx, err := db.Begin()
+		if err != nil {
+			http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
+			return
 		}
+
+		// Insert group into the database
+		_, err = tx.Exec(`INSERT INTO groups (id, name, description, creator_id) VALUES (?, ?, ?, ?)`,
+			group.ID, group.Name, group.Description, group.CreatorID)
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Failed to create group", http.StatusInternalServerError)
+			return
+		}
+
+		// Insert creator into group_membership as 'member'
+		_, err = tx.Exec(`INSERT INTO group_membership (id, group_id, user_id, status) VALUES (?, ?, ?, 'member')`,
+			uuid.New().String(), group.ID, group.CreatorID)
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Failed to add creator to group membership", http.StatusInternalServerError)
+			return
+		}
+
+		// Commit transaction
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
+			return
+		}
+
+		// Return success response
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Group created successfully", "group_id": group.ID})
+	}
+}
 
 // RequestToJoinHandler - Allows users to request to join a group
 func RequestToJoinHandler(db *sql.DB) http.HandlerFunc {
@@ -309,34 +308,34 @@ func RequestToJoinHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
 // HandleJoinRequestHandler - Allows group creator to accept or decline join requests
 func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Only allow PUT requests.
 		if r.Method != http.MethodPut {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
 
-		// Get creator ID from session
+		// Get the creator's (logged-in user's) ID from the session.
 		creatorID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
+		// Parse the request body.
 		var request struct {
 			GroupID string `json:"group_id"`
-			UserID  string `json:"user_id"`
-			Action  string `json:"action"` // "accept" or "decline"
+			UserID  string `json:"user_id"` // The requester's ID.
+			Action  string `json:"action"`  // "accept" or "decline"
 		}
-
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		// Ensure only the group creator can approve/decline requests
+		// Ensure that only the group creator can handle join requests.
 		var ownerID, groupName string
 		err = db.QueryRow(`SELECT creator_id, name FROM groups WHERE id = ?`, request.GroupID).Scan(&ownerID, &groupName)
 		if err == sql.ErrNoRows {
@@ -352,14 +351,19 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Handle actions & send notifications
+		// Process the join request.
 		var notificationMsg string
 		if request.Action == "accept" {
+			// Update the membership status to 'member'.
 			_, err = db.Exec(`UPDATE group_membership SET status = 'member' WHERE group_id = ? AND user_id = ? AND status = 'pending_request'`, request.GroupID, request.UserID)
 			notificationMsg = fmt.Sprintf("Your request to join %s has been approved.", groupName)
-		} else {
+		} else if request.Action == "decline" {
+			// Delete the pending request.
 			_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'pending_request'`, request.GroupID, request.UserID)
 			notificationMsg = fmt.Sprintf("Your request to join %s has been declined.", groupName)
+		} else {
+			http.Error(w, "Invalid action", http.StatusBadRequest)
+			return
 		}
 
 		if err != nil {
@@ -367,8 +371,25 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		//Notify the user
-		_ = notifications.CreateNotification(db, request.UserID, "group_join_request", notificationMsg, "", creatorID, request.GroupID, "")
+		// Delete the original join request notification so it won't reappear.
+		_, err = db.Exec(`
+			DELETE FROM notifications 
+			WHERE type = 'group_join_request' 
+			  AND user_id = ? 
+			  AND group_id = ? 
+			  AND related_user_id = ?`,
+			creatorID, request.GroupID, request.UserID)
+		if err != nil {
+			http.Error(w, "Failed to delete join request notification", http.StatusInternalServerError)
+			return
+		}
+
+		// Notify the requester about the response.
+		err = notifications.CreateNotification(db, request.UserID, "group_join_request", notificationMsg, "", creatorID, request.GroupID, "")
+		if err != nil {
+			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
+			return
+		}
 
 		w.Write([]byte("Join request " + request.Action + "ed successfully"))
 	}
@@ -377,47 +398,47 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 // Allows any group member to send invitations
 func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost {
-					http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-					return
-			}
+		if r.Method != http.MethodPost {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
 
-			// Get user ID from session
-			inviterID, err := sessions.GetUserIDFromSession(r)
-			if err != nil {
-					http.Error(w, "Unauthorized", http.StatusUnauthorized)
-					return
-			}
+		// Get user ID from session
+		inviterID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 
-			var invite struct {
-					GroupID string `json:"group_id"`
-					UserID  string `json:"user_id"`
-			}
+		var invite struct {
+			GroupID string `json:"group_id"`
+			UserID  string `json:"user_id"`
+		}
 
-			if err := json.NewDecoder(r.Body).Decode(&invite); err != nil {
-					http.Error(w, "Invalid request body", http.StatusBadRequest)
-					return
-			}
+		if err := json.NewDecoder(r.Body).Decode(&invite); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
 
-			// Check if the inviter is a member of the group (not just the creator)
-			var isMember bool
-			err = db.QueryRow(`
+		// Check if the inviter is a member of the group (not just the creator)
+		var isMember bool
+		err = db.QueryRow(`
 					SELECT EXISTS(
 							SELECT 1 FROM group_membership 
 							WHERE group_id = ? AND user_id = ? AND status = 'member'
 					)`, invite.GroupID, inviterID).Scan(&isMember)
 
-			if err != nil {
-					http.Error(w, "Failed to check group membership", http.StatusInternalServerError)
-					return
-			}
+		if err != nil {
+			http.Error(w, "Failed to check group membership", http.StatusInternalServerError)
+			return
+		}
 
-			if !isMember {
-					http.Error(w, "Unauthorized: Only group members can send invites", http.StatusForbidden)
-					return
-			}
+		if !isMember {
+			http.Error(w, "Unauthorized: Only group members can send invites", http.StatusForbidden)
+			return
+		}
 
-				// Check if the user is already in the group or has a pending request
+		// Check if the user is already in the group or has a pending request
 		var existingStatus string
 		err = db.QueryRow(`
 			SELECT status FROM group_membership WHERE group_id = ? AND user_id = ?
@@ -439,29 +460,27 @@ func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-			// Insert invitation with pending status
-			_, err = db.Exec(`
+		// Insert invitation with pending status
+		_, err = db.Exec(`
 					INSERT INTO group_membership (id, group_id, user_id, status) 
 					VALUES (?, ?, ?, 'pending_invite')`, uuid.New().String(), invite.GroupID, invite.UserID)
-			if err != nil {
-					http.Error(w, "Failed to send invitation", http.StatusInternalServerError)
-					return
-			}
+		if err != nil {
+			http.Error(w, "Failed to send invitation", http.StatusInternalServerError)
+			return
+		}
 
-			// Create notification for the invited user
-			err = notifications.CreateNotification(db, invite.UserID, "group_invite",
-					"You have been invited to join a group.", "", inviterID, invite.GroupID, "")
-			if err != nil {
-					http.Error(w, "Failed to create notification", http.StatusInternalServerError)
-					return
-			}
+		// Create notification for the invited user
+		err = notifications.CreateNotification(db, invite.UserID, "group_invite",
+			"You have been invited to join a group.", "", inviterID, invite.GroupID, "")
+		if err != nil {
+			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
+			return
+		}
 
-			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte("Invitation sent successfully"))
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte("Invitation sent successfully"))
 	}
 }
-
-
 
 // HandleInvitationHandler - Accept or Decline an invitation
 func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
@@ -530,8 +549,6 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Invitation " + request.Action + "ed successfully"))
 	}
 }
-
-
 
 // LeaveGroupHandler - Allows users to leave a group
 func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
@@ -611,7 +628,7 @@ func GetUserGroupsHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-//Lets group creators see pending requests
+// Lets group creators see pending requests
 func GetPendingRequestsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -654,7 +671,7 @@ func GetPendingRequestsHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-//Allows the group creator to remove members.
+// Allows the group creator to remove members.
 func RemoveMemberHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
@@ -730,71 +747,70 @@ func DeleteGroupHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-//list all members of a group
+// list all members of a group
 func GetGroupMembersHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodGet {
-					http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-					return
-			}
+		if r.Method != http.MethodGet {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
 
-			userID, err := sessions.GetUserIDFromSession(r)
-			if err != nil {
-					http.Error(w, "Unauthorized", http.StatusUnauthorized)
-					return
-			}
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 
-			// Extract group ID from query params
-			groupID := r.URL.Query().Get("group_id")
-			if groupID == "" {
-					http.Error(w, "Missing group_id", http.StatusBadRequest)
-					return
-			}
+		// Extract group ID from query params
+		groupID := r.URL.Query().Get("group_id")
+		if groupID == "" {
+			http.Error(w, "Missing group_id", http.StatusBadRequest)
+			return
+		}
 
-			   // Check if user is a member
-				 var isMember bool
-				 err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
- 
-				 if err != nil || !isMember {
-						 http.Error(w, "Forbidden: Only members can view the member list", http.StatusForbidden)
-						 return
-				 }
+		// Check if user is a member
+		var isMember bool
+		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
 
-			// Fetch members of the group
-			rows, err := db.Query(`
+		if err != nil || !isMember {
+			http.Error(w, "Forbidden: Only members can view the member list", http.StatusForbidden)
+			return
+		}
+
+		// Fetch members of the group
+		rows, err := db.Query(`
 					SELECT u.id, u.first_name, u.last_name, u.nickname, u.avatar 
 					FROM users u
 					INNER JOIN group_membership gm ON u.id = gm.user_id
 					WHERE gm.group_id = ? AND gm.status = 'member'
 			`, groupID)
-			if err != nil {
-					http.Error(w, "Failed to fetch group members", http.StatusInternalServerError)
-					return
-			}
-			defer rows.Close()
+		if err != nil {
+			http.Error(w, "Failed to fetch group members", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
 
-			// Store members in a slice
-			var members []map[string]string
-			for rows.Next() {
-					var userID, firstName, lastName, nickname, avatar string
-					if err := rows.Scan(&userID, &firstName, &lastName, &nickname, &avatar); err != nil {
-							http.Error(w, "Failed to parse members data", http.StatusInternalServerError)
-							return
-					}
-					members = append(members, map[string]string{
-							"id":         userID,
-							"first_name": firstName,
-							"last_name":  lastName,
-							"nickname":   nickname,
-							"avatar":     avatar,
-					})
+		// Store members in a slice
+		var members []map[string]string
+		for rows.Next() {
+			var userID, firstName, lastName, nickname, avatar string
+			if err := rows.Scan(&userID, &firstName, &lastName, &nickname, &avatar); err != nil {
+				http.Error(w, "Failed to parse members data", http.StatusInternalServerError)
+				return
 			}
+			members = append(members, map[string]string{
+				"id":         userID,
+				"first_name": firstName,
+				"last_name":  lastName,
+				"nickname":   nickname,
+				"avatar":     avatar,
+			})
+		}
 
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(members)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(members)
 	}
 }
-
 
 // CreateGroupPostHandler allows users to create posts in a group
 func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
@@ -806,14 +822,14 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
 		}
 
 		groupID := r.Form.Get("group_id")
 		if groupID == "" {
-				http.Error(w, "Group ID is required", http.StatusBadRequest)
-				return
+			http.Error(w, "Group ID is required", http.StatusBadRequest)
+			return
 		}
 
 		// Check if the user is a member
@@ -821,8 +837,8 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
 
 		if err != nil || !isMember {
-				http.Error(w, "Forbidden: Only members can create posts", http.StatusForbidden)
-				return
+			http.Error(w, "Forbidden: Only members can create posts", http.StatusForbidden)
+			return
 		}
 
 		// Parse multipart form (for file uploads)
@@ -831,7 +847,7 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		
+
 		// Extract form values
 		content := r.Form.Get("content")
 
@@ -844,8 +860,8 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 		words := strings.Fields(content)
 		if len(words) > 250 {
 			http.Error(w, "Content cannot exceed 250 words", http.StatusBadRequest)
-		return
-	}
+			return
+		}
 
 		// Ensure "uploads" directory exists
 		uploadDir := "uploads"
@@ -922,7 +938,6 @@ func contains(slice []string, item string) bool {
 	}
 	return false
 }
-
 
 // DeleteGroupPostHandler allows a user to delete their own group post
 func DeleteGroupPostHandler(db *sql.DB) http.HandlerFunc {
@@ -1057,8 +1072,6 @@ func GetGroupPostsHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
-
 // CreateGroupPostCommentHandler allows users to add comments to group posts
 func CreateGroupPostCommentHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -1093,8 +1106,8 @@ func CreateGroupPostCommentHandler(db *sql.DB) http.HandlerFunc {
 		words := strings.Fields(request.Content)
 		if len(words) > 200 {
 			http.Error(w, "Content cannot exceed 200 words", http.StatusBadRequest)
-		return
-	}
+			return
+		}
 
 		// Insert into database
 		commentID := uuid.New().String()
@@ -1107,7 +1120,6 @@ func CreateGroupPostCommentHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Comment added successfully"))
 	}
 }
-
 
 // GetGroupPostCommentsHandler retrieves comments for a specific group post
 func GetGroupPostCommentsHandler(db *sql.DB) http.HandlerFunc {
@@ -1163,7 +1175,6 @@ func GetGroupPostCommentsHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
 // DeleteGroupPostCommentHandler allows a user to delete their own comment
 func DeleteGroupPostCommentHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -1213,4 +1224,3 @@ func DeleteGroupPostCommentHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Comment deleted successfully"))
 	}
 }
-

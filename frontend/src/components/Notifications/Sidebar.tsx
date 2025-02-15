@@ -1,16 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Cookies from "js-cookie";
 import { Button } from "@/components/ui/button";
 import { Bell, X } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface Notification {
-  id: number;
-  message: string;
-  avatar?: string;
-  read?: boolean;
-  timestamp?: string;
+  id: string;
+  user_id: string; // For join requests, this should be the group creator's id.
+  type: string;
+  content: string;
+  post_id?: string;
+  related_user_id?: string; // For join requests, this is the requester's id.
+  group_id?: string;
+  event_id?: string;
+  read: boolean;
+  created_at: string;
 }
 
 interface RightSidebarProps {
@@ -18,46 +24,112 @@ interface RightSidebarProps {
   onClose: () => void;
 }
 
+// Helper function to convert a timestamp into a relative time string.
+function formatTime(timestamp: string): string {
+  const time = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - time.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return `${diffSec} seconds ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} minutes ago`;
+  const diffHrs = Math.floor(diffMin / 60);
+  if (diffHrs < 24) return `${diffHrs} hours ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  return `${diffDays} days ago`;
+}
+
 export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const currentUserId = Cookies.get("user_id"); // This cookie should be set by your auth system
 
-  useEffect(() => {
-    const demoNotifications: Notification[] = [
-      {
-        id: 1,
-        message: "John Doe sent you a friend request.",
-        avatar: "/profile.png",
-        read: false,
-        timestamp: "2 mins ago",
-      },
-      {
-        id: 2,
-        message: "Your group invitation has been accepted.",
-        avatar: "/group.png",
-        read: true,
-        timestamp: "1 hour ago",
-      },
-      {
-        id: 3,
-        message: "Jane commented on your post.",
-        avatar: "/profile2.png",
-        read: false,
-        timestamp: "3 hours ago",
-      },
-    ];
-    setNotifications(demoNotifications);
-  }, []);
-
-  // Mark a single notification as read when clicked
-  const handleMarkAsRead = (id: number) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+  // Fetch notifications from the backend.
+  const fetchNotifications = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("http://localhost:8080/notifications/get", {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        console.error(
+          "Failed to fetch notifications, status:",
+          res.status,
+          await res.text()
+        );
+        return;
+      }
+      const data = await res.json();
+      setNotifications(data);
+    } catch (error) {
+      console.error("Error fetching notifications", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Mark all notifications as read
-  const handleMarkAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  // Mark a notification as read.
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      const res = await fetch(
+        `http://localhost:8080/notifications/read?id=${notificationId}`,
+        {
+          method: "PUT",
+          credentials: "include",
+        }
+      );
+      if (res.ok) {
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notificationId ? { ...n, read: true } : n
+          )
+        );
+      } else {
+        console.error("Failed to mark notification as read", res.status);
+      }
+    } catch (error) {
+      console.error("Error marking notification as read", error);
+    }
+  };
+
+  // Handle join-request actions (accept/decline).
+  const handleJoinRequestAction = async (
+    notification: Notification,
+    action: "accept" | "decline"
+  ) => {
+    console.log(
+      "Join request action:",
+      "Current user id:",
+      currentUserId,
+      "Expected group creator id:",
+      notification.user_id
+    );
+    try {
+      const res = await fetch("http://localhost:8080/groups/join/respond", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_id: notification.group_id,
+          user_id: notification.related_user_id, // The requester’s id.
+          action: action,
+        }),
+      });
+      if (res.ok) {
+        // Remove the notification after processing.
+        setNotifications((prev) =>
+          prev.filter((n) => n.id !== notification.id)
+        );
+      } else {
+        console.error("Failed to handle join request", res.status);
+      }
+    } catch (error) {
+      console.error("Error handling join request", error);
+    }
   };
 
   return (
@@ -83,35 +155,76 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
 
       {/* Notifications List */}
       <div className="flex-1 overflow-y-auto pr-2">
-        {notifications.length === 0 ? (
+        {loading ? (
+          <p className="text-center text-lg mt-10">Loading notifications...</p>
+        ) : notifications.length === 0 ? (
           <p className="text-center text-lg mt-10">No notifications yet!</p>
         ) : (
           <ul className="space-y-4">
             {notifications.map((notification) => (
               <li
                 key={notification.id}
-                onClick={() => handleMarkAsRead(notification.id)}
+                onClick={() => {
+                  if (notification.type !== "group_join_request") {
+                    markNotificationAsRead(notification.id);
+                  }
+                }}
                 className={`
-                  flex items-center gap-4 p-4 rounded-xl shadow-md transition transform hover:scale-105 cursor-pointer
+                  flex flex-col p-4 rounded-xl shadow-md transition transform hover:scale-105 cursor-pointer
                   ${notification.read ? "bg-white/10" : "bg-white/20"}
                 `}
               >
-                <div className="relative">
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage src={notification.avatar || "/profile.png"} alt="Notification Avatar" />
-                    <AvatarFallback>{notification.message.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  {/* Show a red dot if the notification is unread */}
-                  {!notification.read && (
-                    <span className="absolute top-0 right-0 block h-3 w-3 rounded-full bg-red-500 border-2 border-white"></span>
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <Avatar className="w-10 h-10">
+                      <AvatarImage src="/profile.png" alt="Notification Avatar" />
+                      <AvatarFallback>
+                        {notification.content.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    {!notification.read && (
+                      <span className="absolute top-0 right-0 block h-3 w-3 rounded-full bg-red-500 border-2 border-white"></span>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm ${notification.read ? "opacity-80" : "font-semibold"}`}>
+                      {notification.content}
+                    </p>
+                    <span className="text-xs text-gray-200">
+                      {formatTime(notification.created_at)}
+                    </span>
+                  </div>
+                </div>
+                {/* Render join-request buttons only for pending requests.
+                    We assume that if the notification content already contains "has been" (approved/declined),
+                    it is a response notification and the buttons should not be shown.
+                    Also, only show buttons if the current user is the group creator. */}
+                {notification.type === "group_join_request" &&
+                  !notification.content.toLowerCase().includes("has been") &&
+                  currentUserId === notification.user_id && (
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        variant="outline"
+                        className="w-full border-green-400 text-green-400 hover:bg-green-500 hover:text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleJoinRequestAction(notification, "accept");
+                        }}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full border-red-400 text-red-400 hover:bg-red-500 hover:text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleJoinRequestAction(notification, "decline");
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    </div>
                   )}
-                </div>
-                <div className="flex-1">
-                  <p className={`text-sm ${notification.read ? "opacity-80" : "font-semibold"}`}>
-                    {notification.message}
-                  </p>
-                  <span className="text-xs text-gray-200">{notification.timestamp}</span>
-                </div>
               </li>
             ))}
           </ul>
@@ -123,7 +236,25 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
         <Button
           variant="outline"
           className="w-full border-white/30 text-white bg-teal-500 hover:bg-teal-600"
-          onClick={handleMarkAllAsRead}
+          onClick={async () => {
+            try {
+              await Promise.all(
+                notifications.map((n) => {
+                  if (!n.read) {
+                    return fetch(`http://localhost:8080/notifications/read?id=${n.id}`, {
+                      method: "PUT",
+                      credentials: "include",
+                    });
+                  }
+                })
+              );
+              setNotifications((prev) =>
+                prev.map((n) => ({ ...n, read: true }))
+              );
+            } catch (error) {
+              console.error("Error marking all as read", error);
+            }
+          }}
         >
           Mark all as read
         </Button>
