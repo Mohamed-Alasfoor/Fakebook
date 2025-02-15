@@ -12,6 +12,8 @@ export interface Group {
     content: string;
     image_url?: string;
     created_at: string;
+    nickname?: string;  
+    avatar?: string;  
   }
   
   export interface Member {
@@ -29,6 +31,7 @@ export interface Group {
     description: string;
     event_date: string;
     creator_id: string;
+    user_status: string;
   }
   
   export interface RSVPStatus {

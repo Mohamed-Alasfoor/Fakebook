@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { MessageCircle, Users, Calendar, Send } from "lucide-react";
+import { MessageCircle, Users, Calendar } from "lucide-react";
 import PostsTab from "@/components/groups/PostsTab";
 import MembersTab from "@/components/groups/MembersTab";
 import EventsTab from "@/components/groups/EventsTab";
@@ -23,7 +23,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ChatTab from "@/components/groups/ChatTab";
 import Cookies from "js-cookie";
-
 
 interface ChatMessage {
   sender_id: string;
@@ -88,7 +87,10 @@ export default function GroupView() {
             ),
           ]);
 
-        if (!groupResponse?.data || Object.keys(groupResponse.data).length === 0) {
+        if (
+          !groupResponse?.data ||
+          Object.keys(groupResponse.data).length === 0
+        ) {
           router.push("/groups");
           return;
         }
@@ -111,7 +113,9 @@ export default function GroupView() {
 
   // --- Create Post ---
   const handleCreatePost = async () => {
-    if (!postContent.trim()) return alert("Post content cannot be empty.");
+    if (!postContent.trim()) {
+      return alert("Post content cannot be empty.");
+    }
 
     const formData = new FormData();
     formData.append("group_id", params.id as string);
@@ -202,6 +206,7 @@ export default function GroupView() {
           description: eventDescription,
           event_date: eventDateTime,
           creator_id: "me",
+          user_status: "none",
         },
         ...events,
       ]);
@@ -215,7 +220,7 @@ export default function GroupView() {
     }
   };
 
-  // --- RSVP Handler ---
+  // --- RSVP Handler (Updated to directly update events array) ---
   const handleRSVP = async (eventId: string, status: "going" | "not going") => {
     try {
       await axios.post(
@@ -224,6 +229,14 @@ export default function GroupView() {
         { withCredentials: true }
       );
 
+      // Update the user_status in the events array directly
+      setEvents((prevEvents) =>
+        prevEvents.map((ev) =>
+          ev.id === eventId ? { ...ev, user_status: status } : ev
+        )
+      );
+
+      // You can still track RSVPs separately if you want:
       setRsvps((prev) => {
         const existingRSVP = prev.find((rsvp) => rsvp.event_id === eventId);
         if (existingRSVP) {
@@ -291,7 +304,9 @@ export default function GroupView() {
     );
   if (!group)
     return (
-      <div className="text-center py-10 text-red-500">Group not found.</div>
+      <div className="text-center py-10 text-red-500">
+        Group not found.
+      </div>
     );
 
   return (
@@ -303,7 +318,8 @@ export default function GroupView() {
               <div>
                 <CardTitle className="text-2xl">{group.name}</CardTitle>
                 <CardDescription className="text-slate-200 mt-2">
-                  Created on {new Date(group.created_at).toLocaleDateString()}
+                  Created on{" "}
+                  {new Date(group.created_at).toLocaleDateString()}
                 </CardDescription>
               </div>
               <Button
@@ -354,16 +370,29 @@ export default function GroupView() {
                 />
               </TabsContent>
 
+              {/* Chat Tab */}
+              <TabsContent value="chat" className="p-0">
+                <ChatTab
+                  messages={messages}
+                  newMessage={newMessage}
+                  setNewMessage={setNewMessage}
+                  handleSendMessage={handleSendMessage}
+                  currentUserId={Cookies.get("user_id")}
+                />
+              </TabsContent>
+
               {/* Members Tab */}
               <TabsContent value="members">
-                <MembersTab members={members} isLoadingMembers={isLoadingMembers} />
+                <MembersTab
+                  members={members}
+                  isLoadingMembers={isLoadingMembers}
+                />
               </TabsContent>
 
               {/* Events Tab */}
               <TabsContent value="events">
                 <EventsTab
                   events={events}
-                  rsvps={rsvps}
                   isCreatingEvent={isCreatingEvent}
                   setIsCreatingEvent={setIsCreatingEvent}
                   eventTitle={eventTitle}
@@ -375,17 +404,6 @@ export default function GroupView() {
                   handleCreateEvent={handleCreateEvent}
                   handleRSVP={handleRSVP}
                 />
-              </TabsContent>
-
-              {/* Chat Tab */}
-              <TabsContent value="chat" className="p-0">
-                <ChatTab
-                  messages={messages}
-                  newMessage={newMessage}
-                  setNewMessage={setNewMessage}
-                  handleSendMessage={handleSendMessage}
-                  currentUserId= {Cookies.get("user_id")}
-                /> 
               </TabsContent>
             </Tabs>
           </CardContent>

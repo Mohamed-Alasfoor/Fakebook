@@ -11,12 +11,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus } from "lucide-react";
-import { Event, RSVPStatus } from "@/types/groupTypes";
+import { Plus, CalendarDays } from "lucide-react";
+import { Event } from "@/types/groupTypes";
 
 interface EventsTabProps {
   events: Event[];
-  rsvps: RSVPStatus[];
   isCreatingEvent: boolean;
   setIsCreatingEvent: (value: boolean) => void;
   eventTitle: string;
@@ -31,7 +30,6 @@ interface EventsTabProps {
 
 export default function EventsTab({
   events,
-  rsvps,
   isCreatingEvent,
   setIsCreatingEvent,
   eventTitle,
@@ -44,37 +42,42 @@ export default function EventsTab({
   handleRSVP,
 }: EventsTabProps) {
   return (
-    <>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Group Events</h3>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-2xl font-bold text-gray-800">Upcoming Events</h3>
         <Dialog open={isCreatingEvent} onOpenChange={setIsCreatingEvent}>
           <DialogTrigger asChild>
-            <Button className="bg-[#6C5CE7] text-white flex items-center">
-              <Plus className="w-4 h-4 mr-2" />
+            <Button className="bg-[#6C5CE7] text-white flex items-center hover:bg-[#5b4edc] transition-all">
+              <Plus className="w-5 h-5 mr-2" />
               Create Event
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create an Event</DialogTitle>
+              <DialogTitle className="text-lg font-semibold">
+                Create New Event
+              </DialogTitle>
             </DialogHeader>
             <Input
               placeholder="Event Title"
               value={eventTitle}
               onChange={(e) => setEventTitle(e.target.value)}
+              className="mb-2"
             />
             <Textarea
               placeholder="Event Description"
               value={eventDescription}
               onChange={(e) => setEventDescription(e.target.value)}
+              className="mb-2"
             />
             <Input
               type="datetime-local"
               value={eventDateTime}
               onChange={(e) => setEventDateTime(e.target.value)}
+              className="mb-4"
             />
             <Button
-              className="w-full mt-2 bg-[#6C5CE7] text-white"
+              className="w-full bg-[#6C5CE7] text-white hover:bg-[#5b4edc] transition-all"
               onClick={handleCreateEvent}
             >
               Create Event
@@ -84,68 +87,68 @@ export default function EventsTab({
       </div>
 
       {events.length === 0 ? (
-        <p className="text-center text-gray-500">No events yet.</p>
+        <p className="text-center text-gray-500">No events available.</p>
       ) : (
         <div className="grid gap-6">
-          {events.map((event) => {
-            const userRSVP = rsvps.find(
-              (rsvp) => rsvp.event_id === event.id
-            )?.status;
-
-            return (
-              <Card
-                key={event.id}
-                className="border shadow-lg rounded-lg overflow-hidden"
-              >
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-xl font-bold text-[#6C5CE7]">
-                      {event.title}
-                    </h4>
-                    <p className="text-sm text-gray-500">
-                      {new Date(event.event_date).toLocaleString()}
-                    </p>
+          {events.map((event) => (
+            <Card
+              key={event.id}
+              className="border shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-all"
+            >
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xl font-bold text-[#6C5CE7]">
+                    {event.title}
+                  </h4>
+                  <div className="flex items-center text-gray-600 text-sm">
+                    <CalendarDays className="w-5 h-5 mr-1" />
+                    {new Date(event.event_date).toLocaleString()}
                   </div>
-                  <p className="mt-2 text-gray-700">{event.description}</p>
+                </div>
+                <p className="mt-2 text-gray-700">{event.description}</p>
 
-                  <div className="flex justify-between items-center mt-4">
-                    <div className="flex gap-2">
-                      <Button
-                        className={`text-white ${
-                          userRSVP === "going"
-                            ? "bg-green-600"
-                            : "bg-gray-300 hover:bg-green-500"
-                        }`}
-                        onClick={() => handleRSVP(event.id, "going")}
-                      >
-                        ✅ Going
-                      </Button>
-                      <Button
-                        className={`text-white ${
-                          userRSVP === "not going"
-                            ? "bg-red-600"
-                            : "bg-gray-300 hover:bg-red-500"
-                        }`}
-                        onClick={() =>
-                          handleRSVP(event.id, "not going")
-                        }
-                      >
-                        ❌ Not Going
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      Your RSVP:{" "}
-                      <strong>
-                        {userRSVP ? userRSVP.toUpperCase() : "None"}
-                      </strong>
-                    </p>
+                <div className="flex justify-between items-center mt-4">
+                  <div className="flex gap-2">
+                    {/* "Going" Button */}
+                    <Button
+                      className={`px-4 py-2 rounded-lg transition-all ${
+                        event.user_status === "going"
+                          ? "bg-green-600 text-white hover:bg-green-700"
+                          : "bg-gray-300 text-gray-700 hover:bg-green-500 hover:text-white"
+                      }`}
+                      onClick={() => handleRSVP(event.id, "going")}
+                    >
+                      ✅ Going
+                    </Button>
+
+                    {/* "Not Going" Button */}
+                    <Button
+                      className={`px-4 py-2 rounded-lg transition-all ${
+                        event.user_status === "not going"
+                          ? "bg-red-600 text-white hover:bg-red-700"
+                          : "bg-gray-300 text-gray-700 hover:bg-red-500 hover:text-white"
+                      }`}
+                      onClick={() => handleRSVP(event.id, "not going")}
+                    >
+                      ❌ Not Going
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  <p className="text-sm text-gray-600">
+                    Your RSVP:{" "}
+                    <strong className="text-gray-800">
+                      {event.user_status === "going"
+                        ? "Going"
+                        : event.user_status === "not going"
+                        ? "Not Going"
+                        : "None"}
+                    </strong>
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
