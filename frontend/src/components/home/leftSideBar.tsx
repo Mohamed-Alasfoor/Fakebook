@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Home, Users, Settings, MessageCircle, Bell, LogOut, X } from "lucide-react";
+import { Home, Users, Settings, MessageCircle, LogOut, X } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { handleLogout } from "@/lib/functions/logout";
@@ -45,14 +45,15 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
     { icon: Home, label: "Home", href: "/" },
     { icon: Users, label: "Groups", href: "/groups" },
     { icon: MessageCircle, label: "Chats", href: "/chat" },
-    // { icon: Bell, label: "Notifications", href: "/notifications" },
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 
   return (
     <div
       className={`
-        fixed top-0 left-0 z-50 w-64 h-screen bg-[#6C5CE7] text-white p-4 flex flex-col
+        fixed top-0 left-0 z-50 w-80 h-screen
+        bg-gradient-to-br from-purple-700 to-indigo-900
+        text-white p-6 flex flex-col
         transform transition-transform duration-300 ease-in-out
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
         md:translate-x-0
@@ -62,7 +63,7 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center">
-            <span className="text-[#6C5CE7] font-bold">F</span>
+            <span className="text-purple-700 font-bold">F</span>
           </div>
           <span className="font-semibold text-lg">Fakebook</span>
         </div>
