@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"social-network/pkg/chat"
+	"social-network/pkg/sessions"
 	"strings"
 	"time"
 
@@ -204,6 +206,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+// In your auth/logout handler (assuming similar structure to your other handlers)
 func LogoutHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -211,6 +214,7 @@ func LogoutHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Retrieve session cookie and validate session
 		cookie, err := r.Cookie("social-network-session")
 		if err != nil || cookie.Value == "" {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -219,22 +223,38 @@ func LogoutHandler(db *sql.DB) http.HandlerFunc {
 
 		sessionID := cookie.Value
 
+		// Get user ID from session (using your existing helper)
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// Delete session from the database (your existing logic)
 		_, err = db.Exec(`DELETE FROM active_sessions WHERE session_id = ?`, sessionID)
 		if err != nil {
 			http.Error(w, "Failed to logout", http.StatusInternalServerError)
 			return
 		}
 
+		// Mark the user offline in persistent storage
+		if err := chat.MarkUserOffline(db, userID); err != nil {
+			http.Error(w, "Failed to update online status", http.StatusInternalServerError)
+			return
+		}
+
+		// Clear the session cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     "social-network-session",
 			Value:    "",
 			Path:     "/",
-			MaxAge:   -1, // Expire the cookie immediately
+			MaxAge:   -1,
 			HttpOnly: true,
-			Secure:   true,                    // Enable Secure flag
-			SameSite: http.SameSiteStrictMode, // Enforce SameSite: Strict
+			Secure:   true,
+			SameSite: http.SameSiteStrictMode,
 		})
 
 		w.Write([]byte("Logout successful"))
 	}
 }
+

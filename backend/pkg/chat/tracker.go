@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"social-network/pkg/sessions"
 	"sync"
 	"time"
 
@@ -89,19 +90,50 @@ func MarkUserOffline(db *sql.DB, userID string) error {
 // GetPersistentOnlineUsersHandler returns a JSON list of user IDs marked as online in the database.
 func GetPersistentOnlineUsersHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query(`SELECT user_id FROM user_status WHERE status = 'online'`)
+		// Get logged-in user ID from the session.
+		loggedInUserID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
-			http.Error(w, "Failed to fetch persistent online users", http.StatusInternalServerError)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// Query to get users (both online and offline) that are either following you or that you follow.
+		query := `
+			SELECT u.id, u.nickname, u.avatar,
+				CASE WHEN us.status = 'online' THEN 1 ELSE 0 END AS online
+			FROM users u
+			LEFT JOIN user_status us ON u.id = us.user_id
+			WHERE u.id IN (
+				SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted'
+				UNION
+				SELECT follower_id FROM followers WHERE followed_id = ? AND status = 'accepted'
+			)
+		`
+
+		rows, err := db.Query(query, loggedInUserID, loggedInUserID)
+		if err != nil {
+			http.Error(w, "Failed to fetch users", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
-		var onlineUsers []string
+		type OnlineUser struct {
+			ID       string `json:"id"`
+			Nickname string `json:"nickname"`
+			Avatar   string `json:"avatar"`
+			Online   bool   `json:"online"`
+		}
+
+		var onlineUsers []OnlineUser
 		for rows.Next() {
-			var userID string
-			if err := rows.Scan(&userID); err == nil {
-				onlineUsers = append(onlineUsers, userID)
+			var user OnlineUser
+			var onlineInt int
+			if err := rows.Scan(&user.ID, &user.Nickname, &user.Avatar, &onlineInt); err != nil {
+				http.Error(w, "Error scanning user", http.StatusInternalServerError)
+				return
 			}
+			user.Online = onlineInt == 1
+			onlineUsers = append(onlineUsers, user)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
