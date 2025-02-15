@@ -116,8 +116,10 @@ mux.HandleFunc("/groups/chat/messages", groups.GetGroupChatMessagesHandler(db)) 
 // Private Chat Websocket
 mux.HandleFunc("/chat/private", chat.PrivateChatHandler(db))
 mux.HandleFunc("/chat/history", chat.GetPrivateChatHistoryHandler(db))
-mux.HandleFunc("/chat/online_persistent", chat.GetPersistentOnlineUsersHandler(db))
 mux.HandleFunc("/markread", chat.MarkMessageReadHandler(db))
+
+mux.HandleFunc("/ws/online", chat.OnlineUsersSocketHandler(db))
+
 
 mux.Handle("/search", search.SearchHandler(db))
 

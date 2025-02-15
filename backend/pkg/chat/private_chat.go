@@ -129,7 +129,7 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Add the connection to the in-memory tracker.
-		AddClient(userID, conn)
+		AddClient(userID, conn, db)
 		log.Printf("User %s connected to private chat", userID)
 
 		// Update persistent status to "online".
@@ -139,12 +139,13 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 
 		// Ensure that when the connection closes, we mark the user offline.
 		defer func() {
-			RemoveClient(userID)
+			RemoveClient(userID, db)
 			log.Printf("User %s disconnected from private chat", userID)
 			if err := MarkUserOffline(db, userID); err != nil {
 				log.Println("Failed to mark user offline:", err)
 			}
 		}()
+		
 
 		// Main loop: read and process messages.
 		for {

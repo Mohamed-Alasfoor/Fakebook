@@ -2,7 +2,7 @@ package chat
 
 import (
 	"database/sql"
-	"encoding/json"
+	"log"
 	"net/http"
 	"social-network/pkg/sessions"
 	"sync"
@@ -24,21 +24,31 @@ var (
 	clientsMutex sync.RWMutex
 )
 
-// AddClient registers a new client connection.
-func AddClient(userID string, conn *websocket.Conn) {
+// OnlineUser holds the friend details that will be sent.
+type OnlineUser struct {
+	ID       string `json:"id"`
+	Nickname string `json:"nickname"`
+	Avatar   string `json:"avatar"`
+	Online   bool   `json:"online"`
+}
+
+// AddClient registers a new client connection and broadcasts updated status.
+func AddClient(userID string, conn *websocket.Conn, db *sql.DB) {
 	clientsMutex.Lock()
-	defer clientsMutex.Unlock()
 	clients[userID] = &Client{
 		Conn:   conn,
 		UserID: userID,
 	}
+	clientsMutex.Unlock()
+	broadcastFriendsStatus(db)
 }
 
-// RemoveClient unregisters a client connection.
-func RemoveClient(userID string) {
+// RemoveClient unregisters a client connection and broadcasts updated status.
+func RemoveClient(userID string, db *sql.DB) {
 	clientsMutex.Lock()
-	defer clientsMutex.Unlock()
 	delete(clients, userID)
+	clientsMutex.Unlock()
+	broadcastFriendsStatus(db)
 }
 
 // GetClient returns the client associated with the given user ID.
@@ -60,15 +70,6 @@ func GetOnlineUsers() []string {
 	return online
 }
 
-// GetOnlineUsersHandler returns a JSON list of currently online user IDs (in‑memory).
-func GetOnlineUsersHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		onlineUsers := GetOnlineUsers() // Uses the in‑memory tracker
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(onlineUsers)
-	}
-}
-
 // -----------------------
 // Persistent Online Status Functions
 // -----------------------
@@ -87,56 +88,91 @@ func MarkUserOffline(db *sql.DB, userID string) error {
 	return err
 }
 
-// GetPersistentOnlineUsersHandler returns a JSON list of user IDs marked as online in the database.
-func GetPersistentOnlineUsersHandler(db *sql.DB) http.HandlerFunc {
+// getFriendsStatus returns a slice of OnlineUser for a given user.
+// It retrieves users that the given user follows or who follow the given user.
+func getFriendsStatus(db *sql.DB, userID string) ([]OnlineUser, error) {
+	query := `
+		SELECT u.id, u.nickname, u.avatar,
+			CASE WHEN us.status = 'online' THEN 1 ELSE 0 END AS online
+		FROM users u
+		LEFT JOIN user_status us ON u.id = us.user_id
+		WHERE u.id IN (
+			SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted'
+			UNION
+			SELECT follower_id FROM followers WHERE followed_id = ? AND status = 'accepted'
+		)
+	`
+	rows, err := db.Query(query, userID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var friends []OnlineUser
+	for rows.Next() {
+		var friend OnlineUser
+		var onlineInt int
+		if err := rows.Scan(&friend.ID, &friend.Nickname, &friend.Avatar, &onlineInt); err != nil {
+			return nil, err
+		}
+		friend.Online = onlineInt == 1
+		friends = append(friends, friend)
+	}
+	return friends, nil
+}
+
+// broadcastFriendsStatus iterates over each connected client and sends them their friend list.
+func broadcastFriendsStatus(db *sql.DB) {
+	clientsMutex.RLock()
+	defer clientsMutex.RUnlock()
+	for _, client := range clients {
+		// Get personalized friend details for this client.
+		friends, err := getFriendsStatus(db, client.UserID)
+		if err != nil {
+			log.Printf("Error getting friends status for %s: %v", client.UserID, err)
+			continue
+		}
+		// Prepare the message payload.
+		if err := client.Conn.WriteJSON(friends); err != nil {
+			log.Printf("Error broadcasting to client %s: %v", client.UserID, err)
+		}
+		
+	}
+}
+
+// OnlineUsersSocketHandler upgrades the connection and sends real-time friend status updates.
+func OnlineUsersSocketHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get logged-in user ID from the session.
-		loggedInUserID, err := sessions.GetUserIDFromSession(r)
+		// Upgrade the HTTP connection to a WebSocket.
+		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			http.Error(w, "Failed to upgrade connection", http.StatusInternalServerError)
 			return
 		}
 
-		// Query to get users (both online and offline) that are either following you or that you follow.
-		query := `
-			SELECT u.id, u.nickname, u.avatar,
-				CASE WHEN us.status = 'online' THEN 1 ELSE 0 END AS online
-			FROM users u
-			LEFT JOIN user_status us ON u.id = us.user_id
-			WHERE u.id IN (
-				SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted'
-				UNION
-				SELECT follower_id FROM followers WHERE followed_id = ? AND status = 'accepted'
-			)
-		`
-
-		rows, err := db.Query(query, loggedInUserID, loggedInUserID)
+		// Retrieve user ID from session.
+		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
-			http.Error(w, "Failed to fetch users", http.StatusInternalServerError)
+			conn.WriteMessage(websocket.TextMessage, []byte("Unauthorized"))
+			conn.Close()
 			return
 		}
-		defer rows.Close()
 
-		type OnlineUser struct {
-			ID       string `json:"id"`
-			Nickname string `json:"nickname"`
-			Avatar   string `json:"avatar"`
-			Online   bool   `json:"online"`
+		// Add the connection and mark user online.
+		AddClient(userID, conn, db)
+		if err := MarkUserOnline(db, userID); err != nil {
+			log.Printf("Failed to mark user online: %v", err)
 		}
 
-		var onlineUsers []OnlineUser
-		for rows.Next() {
-			var user OnlineUser
-			var onlineInt int
-			if err := rows.Scan(&user.ID, &user.Nickname, &user.Avatar, &onlineInt); err != nil {
-				http.Error(w, "Error scanning user", http.StatusInternalServerError)
-				return
+		// Keep the connection open.
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				RemoveClient(userID, db)
+				if err := MarkUserOffline(db, userID); err != nil {
+					log.Printf("Failed to mark user offline: %v", err)
+				}
+				break
 			}
-			user.Online = onlineInt == 1
-			onlineUsers = append(onlineUsers, user)
 		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(onlineUsers)
 	}
 }
