@@ -70,3 +70,36 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* ---------- Custom Attractive Global Scrollbar ---------- */
+
+/* For WebKit Browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  /* Using a gradient that complements your left sidebar (from purple-700 to indigo-900) */
+  background: linear-gradient(180deg, #6C5CE7, #4A3B8C);
+  border-radius: 10px;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  /* A lighter gradient for the thumb */
+  background: linear-gradient(180deg, #B39DDB, #9575CD);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #CE93D8, #B39DDB);
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #B39DDB linear-gradient(180deg, #6C5CE7, #4A3B8C);
+}
