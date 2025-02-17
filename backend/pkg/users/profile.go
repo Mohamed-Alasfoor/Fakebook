@@ -4,9 +4,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"social-network/pkg/posts"
 	"social-network/pkg/sessions"
+	"strings"
+
+	"github.com/google/uuid"
 )
 
 // User represents basic user info for followers and following lists
@@ -247,46 +254,148 @@ func TogglePrivacyHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// UpdateProfileHandler allows users to update their profile
+// UpdateProfileHandler now handles both JSON and multipart/form-data requests.
+// If the request contains a file in the "avatar" field, it will process it and update the user's avatar.
+// It also checks if the new nickname is already taken by another user.
 func UpdateProfileHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Allow only PUT requests.
 		if r.Method != http.MethodPut {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
 
+		// Get logged-in user ID.
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		var update struct {
+		// Use strings.HasPrefix to check multipart/form-data
+		contentType := r.Header.Get("Content-Type")
+
+		type updateData struct {
 			FirstName string `json:"first_name"`
 			LastName  string `json:"last_name"`
 			Nickname  string `json:"nickname,omitempty"`
 			AboutMe   string `json:"about_me,omitempty"`
 			Avatar    string `json:"avatar,omitempty"`
 		}
+		var update updateData
 
-		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
+		if strings.HasPrefix(contentType, "multipart/form-data") {
+			const maxUploadSize = 10 << 20
+			if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+				http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			update.FirstName = r.FormValue("first_name")
+			update.LastName = r.FormValue("last_name")
+			update.Nickname = r.FormValue("nickname")
+			update.AboutMe = r.FormValue("about_me")
+			if update.FirstName == "" || update.LastName == "" {
+				http.Error(w, "First and last names cannot be empty", http.StatusBadRequest)
+				return
+			}
+			// Check for duplicate nickname.
+			if update.Nickname != "" {
+				var count int
+				err = db.QueryRow("SELECT COUNT(*) FROM users WHERE nickname = ? AND id != ?", update.Nickname, userID).Scan(&count)
+				if err != nil {
+					http.Error(w, "Database error", http.StatusInternalServerError)
+					return
+				}
+				if count > 0 {
+					http.Error(w, "Nickname already taken", http.StatusBadRequest)
+					return
+				}
+			}
+
+			// Process avatar file.
+			file, fileHeader, err := r.FormFile("avatar")
+			if err == nil {
+				defer file.Close()
+				allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif"}
+				fileExt := strings.ToLower(filepath.Ext(fileHeader.Filename))
+				valid := false
+				for _, ext := range allowedExtensions {
+					if fileExt == ext {
+						valid = true
+						break
+					}
+				}
+				if !valid {
+					http.Error(w, "Invalid avatar file type", http.StatusBadRequest)
+					return
+				}
+				avatarDir := "avatars"
+				if _, err := os.Stat(avatarDir); os.IsNotExist(err) {
+					if err := os.MkdirAll(avatarDir, 0755); err != nil {
+						http.Error(w, "Failed to create avatar directory", http.StatusInternalServerError)
+						return
+					}
+				}
+				avatarFilename := uuid.New().String() + fileExt
+				avatarPath := filepath.Join(avatarDir, avatarFilename)
+				outFile, err := os.Create(avatarPath)
+				if err != nil {
+					http.Error(w, "Failed to create avatar file", http.StatusInternalServerError)
+					return
+				}
+				defer outFile.Close()
+				if _, err := io.Copy(outFile, file); err != nil {
+					http.Error(w, "Failed to save avatar file", http.StatusInternalServerError)
+					return
+				}
+				update.Avatar = avatarFilename
+			} else if err != http.ErrMissingFile {
+				http.Error(w, "Error processing avatar: "+err.Error(), http.StatusBadRequest)
+				return
+			} else {
+				// If no new avatar, use current value.
+				var currentAvatar string
+				err = db.QueryRow("SELECT avatar FROM users WHERE id = ?", userID).Scan(&currentAvatar)
+				if err == nil {
+					update.Avatar = currentAvatar
+				}
+			}
+		} else {
+			// For JSON requests.
+			if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+				http.Error(w, "Invalid request body", http.StatusBadRequest)
+				return
+			}
+			if update.FirstName == "" || update.LastName == "" {
+				http.Error(w, "First and last names cannot be empty", http.StatusBadRequest)
+				return
+			}
+			if update.Nickname != "" {
+				var count int
+				err = db.QueryRow("SELECT COUNT(*) FROM users WHERE nickname = ? AND id != ?", update.Nickname, userID).Scan(&count)
+				if err != nil {
+					http.Error(w, "Database error", http.StatusInternalServerError)
+					return
+				}
+				if count > 0 {
+					http.Error(w, "Nickname already taken", http.StatusBadRequest)
+					return
+				}
+			}
 		}
 
-		// Prevent empty first/last names
-		if update.FirstName == "" || update.LastName == "" {
-			http.Error(w, "First and last names cannot be empty", http.StatusBadRequest)
-			return
-		}
-
-		_, err = db.Exec(`UPDATE users SET first_name=?, last_name=?, nickname=?, about_me=?, avatar=? WHERE id=?`,
-			update.FirstName, update.LastName, update.Nickname, update.AboutMe, update.Avatar, userID)
+		// Update the user's profile.
+		_, err = db.Exec(
+			"UPDATE users SET first_name = ?, last_name = ?, nickname = ?, about_me = ?, avatar = ? WHERE id = ?",
+			update.FirstName, update.LastName, update.Nickname, update.AboutMe, update.Avatar, userID,
+		)
 		if err != nil {
-			http.Error(w, "Failed to update profile", http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Failed to update profile: %v", err), http.StatusInternalServerError)
 			return
 		}
 
 		w.Write([]byte("Profile updated successfully"))
 	}
 }
+

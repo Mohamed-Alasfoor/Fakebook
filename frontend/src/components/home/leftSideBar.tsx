@@ -67,14 +67,22 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
           </div>
           <span className="font-semibold text-lg">Fakebook</span>
         </div>
-        <Button variant="ghost" size="icon" className="md:hidden text-white" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden text-white"
+          onClick={onClose}
+        >
           <X className="h-6 w-6" />
         </Button>
       </div>
 
       {/* Search */}
       <div className="mb-4">
-        <Input placeholder="Search" className="bg-white/20 border-0 placeholder:text-white/70 text-white" />
+        <Input
+          placeholder="Search"
+          className="bg-white/20 border-0 placeholder:text-white/70 text-white"
+        />
       </div>
 
       {/* Navigation */}
@@ -99,18 +107,38 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
         {isLoading ? (
           <p className="text-center text-sm">Loading profile...</p>
         ) : isError || !user ? (
-          <p className="text-center text-red-500 text-sm">Error loading profile</p>
+          <p className="text-center text-red-500 text-sm">
+            Error loading profile
+          </p>
         ) : (
-          <div className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-white/10 rounded-lg" onClick={handleProfileClick}>
+          <div
+            className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-white/10 rounded-lg"
+            onClick={handleProfileClick}
+          >
             <Avatar>
-              <AvatarImage src={user.avatar || "/profile.png"} alt="User Avatar" />
+              <AvatarImage
+                src={
+                  user.avatar
+                    ? `http://localhost:8080/avatars/${user.avatar}`
+                    : "/profile.png"
+                }
+                alt="User Avatar"
+              />
+
               <AvatarFallback>{user.nickname?.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-medium truncate">{user.nickname || "Unknown User"}</h3>
+              <h3 className="text-sm font-medium truncate">
+                {user.nickname || "Unknown User"}
+              </h3>
               <p className="text-xs text-white/70">View Profile</p>
             </div>
-            <Button variant="ghost" size="icon" className="text-white/70 hover:text-white" onClick={handleLogoutClick}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white/70 hover:text-white"
+              onClick={handleLogoutClick}
+            >
               <LogOut className="h-4 w-4" />
               <span className="sr-only">Sign out</span>
             </Button>

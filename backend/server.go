@@ -133,6 +133,8 @@ mux.Handle("/search", search.SearchHandler(db))
 	})))
 
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
+	mux.Handle("/avatars/", http.StripPrefix("/avatars/", http.FileServer(http.Dir("avatars"))))
+
 
 
 

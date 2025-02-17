@@ -12,16 +12,16 @@ import { LeftSidebar } from "@/components/home/leftSideBar";
 import { RightSidebar } from "@/components/Notifications/Sidebar";
 
 export default function SettingsPage() {
-  // This state helps us delay rendering until after mounting
+  // Prevent hydration mismatches.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Get current user id from cookies (client-only)
+  // Get current user id from cookies.
   const userId = Cookies.get("user_id");
 
-  // Always call your SWR hook regardless of mounted state
+  // Fetch user profile data.
   const { user, isLoading, isError, refreshUser } = useUserProfile(userId);
 
   // Local state for profile details.
@@ -29,7 +29,9 @@ export default function SettingsPage() {
   const [lastName, setLastName] = useState("");
   const [nickname, setNickname] = useState("");
   const [aboutMe, setAboutMe] = useState("");
-  const [avatar, setAvatar] = useState("");
+  const [avatar, setAvatar] = useState(""); // current avatar filename
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState(""); // URL for image preview
   const [isPrivate, setIsPrivate] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -42,34 +44,78 @@ export default function SettingsPage() {
       setAboutMe(user.about_me || "");
       setAvatar(user.avatar || "");
       setIsPrivate(user.private);
+      // Use the correct URL for serving avatars.
+      if (user.avatar) {
+        const url = `http://localhost:8080/avatars/${user.avatar}`;
+        setAvatarPreview(url);
+        console.log("Avatar preview URL:", url);
+      }
     }
   }, [user]);
+
+  // Handler for avatar file input change.
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setAvatarFile(file);
+    if (file) {
+      const previewURL = URL.createObjectURL(file);
+      setAvatarPreview(previewURL);
+    }
+  };
 
   // Handler for profile update.
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setMessage("");
     try {
-      await axios.put(
-        "http://localhost:8080/users/profile/update",
-        {
-          first_name: firstName,
-          last_name: lastName,
-          nickname: nickname,
-          about_me: aboutMe,
-          avatar: avatar, // Adjust if you add file upload support later
-        },
-        { withCredentials: true }
-      );
+      if (avatarFile) {
+        const formData = new FormData();
+        formData.append("first_name", firstName);
+        formData.append("last_name", lastName);
+        formData.append("nickname", nickname);
+        formData.append("about_me", aboutMe);
+        formData.append("avatar", avatarFile);
+        await axios.put(
+          "http://localhost:8080/users/profile/update",
+          formData,
+          {
+            withCredentials: true,
+            headers: { "Content-Type": "multipart/form-data" },
+          }
+        );
+      } else {
+        await axios.put(
+          "http://localhost:8080/users/profile/update",
+          {
+            first_name: firstName,
+            last_name: lastName,
+            nickname: nickname,
+            about_me: aboutMe,
+            avatar: avatar,
+          },
+          { withCredentials: true }
+        );
+      }
       setMessage("Profile updated successfully!");
       refreshUser();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setMessage("Error updating profile.");
+      if (
+        err.response &&
+        err.response.data &&
+        typeof err.response.data === "string" &&
+        err.response.data.includes("Nickname already taken")
+      ) {
+        setMessage("Nickname already taken. Please choose another.");
+      } else {
+        setMessage("Error updating profile.");
+      }
     }
   };
 
   // Handler for toggling privacy.
   const handleTogglePrivacy = async () => {
+    setMessage("");
     try {
       await axios.put(
         "http://localhost:8080/users/profile/privacy",
@@ -79,13 +125,12 @@ export default function SettingsPage() {
       setIsPrivate(!isPrivate);
       setMessage("Privacy setting updated!");
       refreshUser();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setMessage("Error updating privacy setting.");
     }
   };
 
-  // Render a fallback if not mounted.
   if (!mounted) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -93,6 +138,8 @@ export default function SettingsPage() {
       </div>
     );
   }
+  if (isLoading) return <div>Loading your profile...</div>;
+  if (isError) return <div>Error loading profile.</div>;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -139,7 +186,29 @@ export default function SettingsPage() {
                   onChange={(e) => setAboutMe(e.target.value)}
                 />
               </div>
-              {/* Optionally, add an input for avatar if desired */}
+              <div>
+                <Label htmlFor="avatar">Avatar</Label>
+                <div className="flex items-center gap-4">
+                  {avatarPreview ? (
+                    <img
+                      src={avatarPreview}
+                      alt="Avatar Preview"
+                      className="w-16 h-16 rounded-full object-cover border"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-xs">
+                      No Avatar
+                    </div>
+                  )}
+                  <Input
+                    id="avatar"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="w-full"
+                  />
+                </div>
+              </div>
               <Button type="submit" className="bg-[#6C5CE7] text-white">
                 Update Profile
               </Button>
