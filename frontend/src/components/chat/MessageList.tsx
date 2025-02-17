@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
+import axios from "axios"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { Message } from "@/types/chat"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface MessageListProps {
   userId: string
@@ -11,58 +11,42 @@ interface MessageListProps {
 
 export function MessageList({ userId }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [messages, setMessages] = useState<Message[]>([])
 
-  const messages: Message[] = [
-    { id: "1", senderId: userId, text: "Hey there!", timestamp: new Date().toISOString() },
-    { id: "2", senderId: "currentUser", text: "Hi! How are you?", timestamp: new Date().toISOString() },
-    {
-      id: "3",
-      senderId: userId,
-      text: "I'm doing great, thanks for asking! How about you?",
-      timestamp: new Date().toISOString(),
-    },
-    {
-      id: "4",
-      senderId: "currentUser",
-      text: "I'm good too. Just working on some projects.",
-      timestamp: new Date().toISOString(),
-    },
-  ]
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const res = await axios.get<Message[]>(`http://localhost:8080/chat/history?with=${userId}`, {
+          withCredentials: true, // ✅ Ensures cookies/tokens are included
+        })
+        setMessages(res.data ?? []) // ✅ Ensures messages is never null
+      } catch (error) {
+        console.error("❌ Error fetching messages:", error)
+        setMessages([]) // ✅ Default to empty array if error occurs
+      }
+    }
+    fetchMessages()
+  }, [userId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [])
+  }, [messages])
 
   return (
     <ScrollArea className="flex-grow p-6">
-      {messages.map((message, index) => (
-        <div
-          key={message.id}
-          className={`flex mb-4 ${message.senderId === "currentUser" ? "justify-end" : "justify-start"}`}
-        >
-          {message.senderId !== "currentUser" && index === 0 && (
-            <Avatar className="h-8 w-8 mr-2">
-              <AvatarImage src={`/avatars/${userId}.jpg`} />
-              <AvatarFallback>{userId.slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-          )}
-          <div
-            className={`p-3 rounded-2xl max-w-xs ${
-              message.senderId === "currentUser" ? "bg-[#6C5CE7] text-white" : "bg-gray-100 text-gray-800"
-            }`}
-          >
-            <p className="text-sm">{message.text}</p>
-            <p className="text-xs mt-1 opacity-70">
-              {new Date(message.timestamp).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </p>
+      {messages.length === 0 ? (
+        <p className="text-center text-gray-400">No messages yet. Start the conversation!</p>
+      ) : (
+        messages.map((message) => (
+          <div key={message.id || Math.random()} className={`flex mb-4 ${message.senderId === "currentUser" ? "justify-end" : "justify-start"}`}>
+            <div className={`p-3 rounded-2xl max-w-xs ${message.senderId === "currentUser" ? "bg-[#6C5CE7] text-white" : "bg-gray-100 text-gray-800"}`}>
+              <p className="text-sm">{message.text}</p>
+              <p className="text-xs mt-1 opacity-70">{new Date(message.timestamp).toLocaleTimeString()}</p>
+            </div>
           </div>
-        </div>
-      ))}
+        ))
+      )}
       <div ref={messagesEndRef} />
     </ScrollArea>
   )
 }
-

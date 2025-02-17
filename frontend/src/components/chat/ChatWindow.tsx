@@ -24,4 +24,3 @@ export function ChatWindow({ user }: ChatWindowProps) {
     </div>
   )
 }
-

@@ -5,19 +5,12 @@ import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 
 interface UserListProps {
+  users: User[]
   onSelectUser: (user: User) => void
   selectedUser: User | null
 }
 
-export function UserList({ onSelectUser, selectedUser }: UserListProps) {
-  const users: User[] = [
-    { id: "1", name: "Alice Johnson", online: true, avatar: "/avatars/alice.jpg" },
-    { id: "2", name: "Bob Smith", online: false, avatar: "/avatars/bob.jpg" },
-    { id: "3", name: "Charlie Brown", online: true, avatar: "/avatars/charlie.jpg" },
-    { id: "4", name: "Diana Prince", online: true, avatar: "/avatars/diana.jpg" },
-    { id: "5", name: "Ethan Hunt", online: false, avatar: "/avatars/ethan.jpg" },
-  ]
-
+export function UserList({ users, onSelectUser, selectedUser }: UserListProps) {
   return (
     <div className="w-80 bg-white shadow-lg rounded-l-2xl flex flex-col">
       <div className="p-6">
@@ -29,15 +22,9 @@ export function UserList({ onSelectUser, selectedUser }: UserListProps) {
       </div>
       <ScrollArea className="flex-grow">
         {users.map((user) => (
-          <UserItem
-            key={user.id}
-            user={user}
-            onClick={() => onSelectUser(user)}
-            isSelected={selectedUser?.id === user.id}
-          />
+          <UserItem key={user.id} user={user} onClick={() => onSelectUser(user)} isSelected={selectedUser?.id === user.id} />
         ))}
       </ScrollArea>
     </div>
   )
 }
-

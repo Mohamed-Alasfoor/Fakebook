@@ -8,6 +8,8 @@ interface UserItemProps {
 }
 
 export function UserItem({ user, onClick, isSelected }: UserItemProps) {
+  if (!user || !user.name) return null  // ✅ Prevents crashes if user is missing
+
   return (
     <div
       className={`flex items-center p-4 cursor-pointer transition-all duration-200 ${
@@ -21,13 +23,11 @@ export function UserItem({ user, onClick, isSelected }: UserItemProps) {
       </Avatar>
       <div className="flex-grow">
         <p className={`text-sm font-semibold ${isSelected ? "text-[#6C5CE7]" : "text-gray-900"}`}>{user.name}</p>
-        <p className="text-xs text-gray-500 truncate">Last message...</p>
+        <p className="text-xs text-gray-500 truncate">{user.online ? "Online" : "Offline"}</p>
       </div>
       <div className="flex flex-col items-end">
-        <p className="text-xs text-gray-400 mb-1">12:34 PM</p>
         <div className={`w-3 h-3 rounded-full ${user.online ? "bg-green-500" : "bg-gray-300"}`} />
       </div>
     </div>
   )
 }
-
