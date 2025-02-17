@@ -1,18 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Cookies from "js-cookie";
 import { Button } from "@/components/ui/button";
 import { Bell, X } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import Cookies from "js-cookie";
 
 interface Notification {
   id: string;
-  user_id: string; // For join requests, this should be the group creator's id.
+  user_id: string;
   type: string;
   content: string;
   post_id?: string;
-  related_user_id?: string; // For join requests, this is the requester's id.
+  related_user_id?: string;
   group_id?: string;
   event_id?: string;
   read: boolean;
@@ -24,7 +24,6 @@ interface RightSidebarProps {
   onClose: () => void;
 }
 
-// Helper function to convert a timestamp into a relative time string.
 function formatTime(timestamp: string): string {
   const time = new Date(timestamp);
   const now = new Date();
@@ -42,9 +41,8 @@ function formatTime(timestamp: string): string {
 export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const currentUserId = Cookies.get("user_id"); // This cookie should be set by your auth system
+  const currentUserId = Cookies.get("user_id");
 
-  // Fetch notifications from the backend.
   const fetchNotifications = async () => {
     setLoading(true);
     try {
@@ -57,12 +55,16 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           res.status,
           await res.text()
         );
+        // If error, default notifications to an empty array.
+        setNotifications([]);
         return;
       }
       const data = await res.json();
-      setNotifications(data);
+      // Use the nullish coalescing operator to default to an empty array if data is null.
+      setNotifications(data ?? []);
     } catch (error) {
       console.error("Error fetching notifications", error);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,6 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     fetchNotifications();
   }, []);
 
-  // Mark a notification as read.
   const markNotificationAsRead = async (notificationId: string) => {
     try {
       const res = await fetch(
@@ -84,9 +85,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
       );
       if (res.ok) {
         setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notificationId ? { ...n, read: true } : n
-          )
+          prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
         );
       } else {
         console.error("Failed to mark notification as read", res.status);
@@ -96,7 +95,6 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     }
   };
 
-  // Handle join-request actions (accept/decline).
   const handleJoinRequestAction = async (
     notification: Notification,
     action: "accept" | "decline"
@@ -115,12 +113,11 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           group_id: notification.group_id,
-          user_id: notification.related_user_id, // The requester’s id.
+          user_id: notification.related_user_id, // The requester's id.
           action: action,
         }),
       });
       if (res.ok) {
-        // Remove the notification after processing.
         setNotifications((prev) =>
           prev.filter((n) => n.id !== notification.id)
         );
@@ -148,7 +145,12 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           <Bell className="w-7 h-7" />
           <span className="text-2xl font-semibold">Notifications</span>
         </div>
-        <Button variant="ghost" size="icon" className="md:hidden text-white" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden text-white"
+          onClick={onClose}
+        >
           <X className="w-7 h-7" />
         </Button>
       </div>
@@ -177,7 +179,10 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     <Avatar className="w-10 h-10">
-                      <AvatarImage src="/profile.png" alt="Notification Avatar" />
+                      <AvatarImage
+                        src="/profile.png"
+                        alt="Notification Avatar"
+                      />
                       <AvatarFallback>
                         {notification.content.charAt(0)}
                       </AvatarFallback>
@@ -187,7 +192,11 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                     )}
                   </div>
                   <div className="flex-1">
-                    <p className={`text-sm ${notification.read ? "opacity-80" : "font-semibold"}`}>
+                    <p
+                      className={`text-sm ${
+                        notification.read ? "opacity-80" : "font-semibold"
+                      }`}
+                    >
                       {notification.content}
                     </p>
                     <span className="text-xs text-gray-200">
@@ -195,10 +204,6 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                     </span>
                   </div>
                 </div>
-                {/* Render join-request buttons only for pending requests.
-                    We assume that if the notification content already contains "has been" (approved/declined),
-                    it is a response notification and the buttons should not be shown.
-                    Also, only show buttons if the current user is the group creator. */}
                 {notification.type === "group_join_request" &&
                   !notification.content.toLowerCase().includes("has been") &&
                   currentUserId === notification.user_id && (
@@ -241,10 +246,13 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
               await Promise.all(
                 notifications.map((n) => {
                   if (!n.read) {
-                    return fetch(`http://localhost:8080/notifications/read?id=${n.id}`, {
-                      method: "PUT",
-                      credentials: "include",
-                    });
+                    return fetch(
+                      `http://localhost:8080/notifications/read?id=${n.id}`,
+                      {
+                        method: "PUT",
+                        credentials: "include",
+                      }
+                    );
                   }
                 })
               );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "next/link"; // Added import for Link
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,20 +55,20 @@ export default function RegisterPage() {
       formData.append("password", password);
       formData.append("first_name", firstName);
       formData.append("last_name", lastName);
-      formData.append("nickname", nickname);
+      // Only append nickname if it's not empty.
+      if (nickname.trim() !== "") {
+        formData.append("nickname", nickname);
+      }
       formData.append("about_me", about);
       formData.append("date_of_birth", dateOfBirth);
-
       if (avatar) {
         formData.append("avatar", avatar);
       }
 
       // Send registration data to the backend
       await axios.post("http://localhost:8080/register", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        withCredentials: true, // Ensures cookies are sent/received
+        headers: { "Content-Type": "multipart/form-data" },
+        withCredentials: true,
       });
 
       // Immediately login using the same email and password
