@@ -304,9 +304,7 @@ export default function GroupView() {
     );
   if (!group)
     return (
-      <div className="text-center py-10 text-red-500">
-        Group not found.
-      </div>
+      <div className="text-center py-10 text-red-500">Group not found.</div>
     );
 
   return (
@@ -318,8 +316,7 @@ export default function GroupView() {
               <div>
                 <CardTitle className="text-2xl">{group.name}</CardTitle>
                 <CardDescription className="text-slate-200 mt-2">
-                  Created on{" "}
-                  {new Date(group.created_at).toLocaleDateString()}
+                  Created on {new Date(group.created_at).toLocaleDateString()}
                 </CardDescription>
               </div>
               <Button
