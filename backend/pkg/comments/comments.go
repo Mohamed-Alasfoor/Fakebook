@@ -117,10 +117,12 @@ func AddCommentHandler(db *sql.DB) http.HandlerFunc {
         }
 
         // Send notification to the post owner
-        err = notifications.CreateNotification(db, postOwnerID, "comment", "Your post was commented on", postID, userID, "", "")
-        if err != nil {
-            http.Error(w, "Failed to create notification", http.StatusInternalServerError)
-            return
+				if userID != postOwnerID {
+            err = notifications.CreateNotification(db, postOwnerID, "comment", "Your post was commented on", postID, userID, "", "")
+            if err != nil {
+                http.Error(w, "Failed to create notification", http.StatusInternalServerError)
+                return
+            }
         }
 
         w.WriteHeader(http.StatusCreated)

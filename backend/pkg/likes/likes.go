@@ -17,40 +17,43 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Retrieve the session_id from the session cookie
+		// Retrieve the session_id from the session cookie.
 		_, err := sessions.GetSessionValue(r, sessions.SessionCookieName)
 		if err != nil {
 			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
 
-		// Query the database to retrieve the user_id associated with the session_id
-		userID, err := sessions.GetUserIDFromSession(r) 
+		// Retrieve the user_id associated with the session.
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 
-		// Extract post_id from query params
+		// Extract post_id from query params.
 		postID := r.URL.Query().Get("post_id")
 		if postID == "" {
 			http.Error(w, "Missing post_id", http.StatusBadRequest)
 			return
 		}
 
-		// Check if the user has already liked the post
+		// Check if the user has already liked the post.
 		var exists bool
 		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM likes WHERE post_id = ? AND user_id = ?)`, postID, userID).Scan(&exists)
 		if err != nil {
 			http.Error(w, "Failed to check like status", http.StatusInternalServerError)
 			return
 		}
-
 		if exists {
 			http.Error(w, "Post already liked", http.StatusBadRequest)
 			return
 		}
 
-		// Generate a unique ID for the like
+		// Generate a unique ID for the like.
 		likeID := uuid.New().String()
 
-		// Insert the like into the database
+		// Insert the like into the database.
 		query := `
 			INSERT INTO likes (id, post_id, user_id)
 			VALUES (?, ?, ?)
@@ -61,7 +64,7 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Fetch the owner of the post
+		// Fetch the owner of the post.
 		var postOwnerID string
 		err = db.QueryRow(`SELECT user_id FROM posts WHERE id = ?`, postID).Scan(&postOwnerID)
 		if err != nil {
@@ -69,17 +72,20 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Use utility function to add a notification
-		err = notifications.CreateNotification(db, postOwnerID, "like", "Your post was liked", postID, userID, "", "")
-		if err != nil {
-			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
-			return
+		// Only create a notification if the liker is not the post owner.
+		if userID != postOwnerID {
+			err = notifications.CreateNotification(db, postOwnerID, "like", "Your post was liked", postID, userID, "", "")
+			if err != nil {
+				http.Error(w, "Failed to create notification", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte("Post liked successfully"))
 	}
 }
+
 
 // RemoveLikeHandler allows a user to unlike a post
 func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
@@ -97,7 +103,7 @@ func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Query the database to retrieve the user_id associated with the session_id
-		userID, err := sessions.GetUserIDFromSession(r) 
+		userID,_ := sessions.GetUserIDFromSession(r) 
 
 		// Extract post_id from query params
 		postID := r.URL.Query().Get("post_id")
