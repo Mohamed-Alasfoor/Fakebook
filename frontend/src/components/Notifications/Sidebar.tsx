@@ -1,3 +1,4 @@
+// File: src/components/Notifications/Sidebar.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -55,12 +56,10 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           res.status,
           await res.text()
         );
-        // If error, default notifications to an empty array.
         setNotifications([]);
         return;
       }
       const data = await res.json();
-      // Use the nullish coalescing operator to default to an empty array if data is null.
       setNotifications(data ?? []);
     } catch (error) {
       console.error("Error fetching notifications", error);
@@ -99,13 +98,6 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     notification: Notification,
     action: "accept" | "decline"
   ) => {
-    console.log(
-      "Join request action:",
-      "Current user id:",
-      currentUserId,
-      "Expected group creator id:",
-      notification.user_id
-    );
     try {
       const res = await fetch("http://localhost:8080/groups/join/respond", {
         method: "PUT",
@@ -113,7 +105,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           group_id: notification.group_id,
-          user_id: notification.related_user_id, // The requester's id.
+          user_id: notification.related_user_id,
           action: action,
         }),
       });
@@ -126,6 +118,22 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
       }
     } catch (error) {
       console.error("Error handling join request", error);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const res = await fetch("http://localhost:8080/notifications/read-all", {
+        method: "PUT",
+        credentials: "include",
+      });
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      } else {
+        console.error("Failed to mark all as read", res.status);
+      }
+    } catch (error) {
+      console.error("Error marking all as read", error);
     }
   };
 
@@ -154,7 +162,6 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           <X className="w-7 h-7" />
         </Button>
       </div>
-
       {/* Notifications List */}
       <div className="flex-1 overflow-y-auto pr-2">
         {loading ? (
@@ -235,34 +242,12 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           </ul>
         )}
       </div>
-
       {/* Footer */}
       <div className="mt-6 pt-4 border-t border-white/20">
         <Button
           variant="outline"
           className="w-full border-white/30 text-white bg-teal-500 hover:bg-teal-600"
-          onClick={async () => {
-            try {
-              await Promise.all(
-                notifications.map((n) => {
-                  if (!n.read) {
-                    return fetch(
-                      `http://localhost:8080/notifications/read?id=${n.id}`,
-                      {
-                        method: "PUT",
-                        credentials: "include",
-                      }
-                    );
-                  }
-                })
-              );
-              setNotifications((prev) =>
-                prev.map((n) => ({ ...n, read: true }))
-              );
-            } catch (error) {
-              console.error("Error marking all as read", error);
-            }
-          }}
+          onClick={markAllAsRead}
         >
           Mark all as read
         </Button>

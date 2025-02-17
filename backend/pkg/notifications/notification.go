@@ -1,9 +1,11 @@
+// File: pkg/notifications/notification.go
 package notifications
 
 import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+
 	"github.com/google/uuid"
 	"social-network/pkg/sessions"
 )
@@ -28,15 +30,12 @@ func AddNotificationHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
-
 		var notification Notification
 		if err := json.NewDecoder(r.Body).Decode(&notification); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-
 		notification.ID = uuid.New().String()
-
 		_, err := db.Exec(`
 			INSERT INTO notifications (id, user_id, type, content, post_id, related_user_id, group_id, event_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -45,7 +44,6 @@ func AddNotificationHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
 			return
 		}
-
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte("Notification created successfully"))
 	}
@@ -58,13 +56,11 @@ func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
-    //Retrieve user ID from session
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
-		
 		rows, err := db.Query(`
 			SELECT id, user_id, type, content, post_id, related_user_id, group_id, event_id, read, created_at
 			FROM notifications
@@ -76,7 +72,6 @@ func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		defer rows.Close()
-
 		var notifications []Notification
 		for rows.Next() {
 			var notification Notification
@@ -86,26 +81,23 @@ func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 			}
 			notifications = append(notifications, notification)
 		}
-
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(notifications)
 	}
 }
 
-// MarkNotificationReadHandler marks a notification as read
+// MarkNotificationReadHandler marks a single notification as read.
 func MarkNotificationReadHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
-
 		notificationID := r.URL.Query().Get("id")
 		if notificationID == "" {
 			http.Error(w, "Missing notification ID", http.StatusBadRequest)
 			return
 		}
-
 		_, err := db.Exec(`
 			UPDATE notifications
 			SET read = TRUE
@@ -115,7 +107,27 @@ func MarkNotificationReadHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Failed to mark notification as read", http.StatusInternalServerError)
 			return
 		}
-
 		w.Write([]byte("Notification marked as read"))
+	}
+}
+
+// MarkAllNotificationsReadHandler marks all notifications as read for the current user.
+func MarkAllNotificationsReadHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+		_, err = db.Exec(`UPDATE notifications SET read = TRUE WHERE user_id = ?`, userID)
+		if err != nil {
+			http.Error(w, "Failed to mark all notifications as read", http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte("All notifications marked as read"))
 	}
 }

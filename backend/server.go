@@ -54,9 +54,12 @@ func main() {
 	mux.HandleFunc("/posts/privacy", posts.UpdatePostPrivacyHandler(db))
 
 // Notifications
-	mux.HandleFunc("/notifications", notifications.AddNotificationHandler(db))
-	mux.HandleFunc("/notifications/get", notifications.GetNotificationsHandler(db))
-	mux.HandleFunc("/notifications/read", notifications.MarkNotificationReadHandler(db))
+mux.HandleFunc("/notifications", notifications.AddNotificationHandler(db))
+mux.HandleFunc("/notifications/get", notifications.GetNotificationsHandler(db))
+mux.HandleFunc("/notifications/read", notifications.MarkNotificationReadHandler(db))
+mux.HandleFunc("/notifications/read-all", notifications.MarkAllNotificationsReadHandler(db))
+
+
 
   	// Followers
 	mux.HandleFunc("/follow", followers.FollowHandler(db))
