@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
+import Cookies from "js-cookie";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,12 +18,12 @@ import { MessageCircle, Users, Calendar } from "lucide-react";
 import PostsTab from "@/components/groups/PostsTab";
 import MembersTab from "@/components/groups/MembersTab";
 import EventsTab from "@/components/groups/EventsTab";
+import ChatTab from "@/components/groups/ChatTab";
+import { InviteButton } from "@/components/groups/InviteButton";
 import { Group, Post, Member, Event, RSVPStatus } from "@/types/groupTypes";
 import { useWebSocket } from "@/lib/hooks/use-web-socket";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import ChatTab from "@/components/groups/ChatTab";
-import Cookies from "js-cookie";
 
 interface ChatMessage {
   sender_id: string;
@@ -67,6 +68,7 @@ export default function GroupView() {
     const fetchGroupData = async () => {
       try {
         const groupId = params.id as string;
+        console.log("Fetching group data for groupId:", groupId);
         const [groupResponse, postsResponse, membersResponse, eventsResponse] =
           await Promise.all([
             axios.get(
@@ -95,7 +97,14 @@ export default function GroupView() {
           return;
         }
 
-        setGroup(groupResponse.data);
+        // Debug log the fetched group data
+        console.log("Fetched group data:", groupResponse.data);
+        // If your backend returns the ID under a different key, map it here:
+        const fetchedGroup: Group = {
+          ...groupResponse.data,
+          id: groupResponse.data.id || groupResponse.data.group_id,
+        };
+        setGroup(fetchedGroup);
         setPosts(postsResponse?.data || []);
         setMembers(membersResponse?.data || []);
         setEvents(eventsResponse?.data || []);
@@ -116,7 +125,6 @@ export default function GroupView() {
     if (!postContent.trim()) {
       return alert("Post content cannot be empty.");
     }
-
     const formData = new FormData();
     formData.append("group_id", params.id as string);
     formData.append("content", postContent);
@@ -220,7 +228,7 @@ export default function GroupView() {
     }
   };
 
-  // --- RSVP Handler (Updated to directly update events array) ---
+  // --- RSVP Handler ---
   const handleRSVP = async (eventId: string, status: "going" | "not going") => {
     try {
       await axios.post(
@@ -229,14 +237,12 @@ export default function GroupView() {
         { withCredentials: true }
       );
 
-      // Update the user_status in the events array directly
       setEvents((prevEvents) =>
         prevEvents.map((ev) =>
           ev.id === eventId ? { ...ev, user_status: status } : ev
         )
       );
 
-      // You can still track RSVPs separately if you want:
       setRsvps((prev) => {
         const existingRSVP = prev.find((rsvp) => rsvp.event_id === eventId);
         if (existingRSVP) {
@@ -255,7 +261,6 @@ export default function GroupView() {
   // --- Fetch Previous Chat Messages ---
   useEffect(() => {
     if (!params?.id) return;
-
     const fetchMessages = async () => {
       try {
         const response = await axios.get(
@@ -267,7 +272,6 @@ export default function GroupView() {
         console.error("Error fetching previous chat messages:", error);
       }
     };
-
     fetchMessages();
   }, [params?.id]);
 
@@ -319,18 +323,21 @@ export default function GroupView() {
                   Created on {new Date(group.created_at).toLocaleDateString()}
                 </CardDescription>
               </div>
-              <Button
-                variant="secondary"
-                className="bg-white text-[#6C5CE7] hover:bg-slate-100"
-                onClick={() => router.push("/groups")}
-              >
-                Back to Groups
-              </Button>
+              <div className="flex gap-4">
+                <Button
+                  variant="secondary"
+                  className="bg-white text-[#6C5CE7] hover:bg-slate-100"
+                  onClick={() => router.push("/groups")}
+                >
+                  Back to Groups
+                </Button>
+                {/* InviteButton receives the group ID from the fetched group */}
+                <InviteButton groupId={group.id} onInviteSuccess={() => {}} />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-6">
             <p className="text-gray-700 mb-6">{group.description}</p>
-
             <Tabs defaultValue="posts" className="w-full">
               <TabsList className="w-full max-w-md grid grid-cols-4 gap-4 mx-auto mb-6">
                 <TabsTrigger value="posts">

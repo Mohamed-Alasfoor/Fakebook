@@ -503,23 +503,24 @@ func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
 // HandleInvitationHandler - Accept or Decline an invitation
 func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Only allow PUT requests.
 		if r.Method != http.MethodPut {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
 
-		// Get user ID from session
+		// Get user ID from session (this is the invitee)
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
+		// Parse the request body.
 		var request struct {
 			GroupID string `json:"group_id"`
 			Action  string `json:"action"` // "accept" or "decline"
 		}
-
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
@@ -530,7 +531,7 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Fetch the group creator
+		// Fetch the group creator (to notify them)
 		var creatorID string
 		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&creatorID)
 		if err == sql.ErrNoRows {
@@ -541,14 +542,15 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Handle actions
 		var notificationMessage string
 		if request.Action == "accept" {
+			// Update the membership status to 'member'.
 			_, err = db.Exec(`UPDATE group_membership SET status = 'member' WHERE group_id = ? AND user_id = ? AND status = 'pending_invite'`, request.GroupID, userID)
-			notificationMessage = "A user accepted your group invitation."
+			notificationMessage = "Your invitation to join has been accepted."
 		} else {
+			// Delete the pending invitation.
 			_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'pending_invite'`, request.GroupID, userID)
-			notificationMessage = "A user declined your group invitation."
+			notificationMessage = "Your invitation to join has been declined."
 		}
 
 		if err != nil {
@@ -556,7 +558,14 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Send notification to the group creator
+		// Delete the invitation notification (so it doesn’t show up again)
+		_, err = db.Exec(`DELETE FROM notifications WHERE type = 'group_invite' AND user_id = ? AND group_id = ?`, userID, request.GroupID)
+		if err != nil {
+			http.Error(w, "Failed to delete invitation notification", http.StatusInternalServerError)
+			return
+		}
+
+		// Notify the group creator about the response.
 		err = notifications.CreateNotification(db, creatorID, "group_invite_response",
 			notificationMessage, "", userID, request.GroupID, "")
 		if err != nil {
@@ -567,6 +576,7 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Invitation " + request.Action + "ed successfully"))
 	}
 }
+
 
 // LeaveGroupHandler - Allows users to leave a group
 func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {

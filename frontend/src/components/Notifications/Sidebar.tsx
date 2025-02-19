@@ -121,6 +121,32 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     }
   };
 
+  const handleInvitationAction = async (
+    notification: Notification,
+    action: "accept" | "decline"
+  ) => {
+    try {
+      const res = await fetch("http://localhost:8080/groups/invite/respond", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_id: notification.group_id,
+          action: action,
+        }),
+      });
+      if (res.ok) {
+        setNotifications((prev) =>
+          prev.filter((n) => n.id !== notification.id)
+        );
+      } else {
+        console.error("Failed to handle invitation", res.status);
+      }
+    } catch (error) {
+      console.error("Error handling invitation", error);
+    }
+  };
+
   const markAllAsRead = async () => {
     try {
       const res = await fetch("http://localhost:8080/notifications/read-all", {
@@ -141,12 +167,11 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     <div
       className={`
         fixed top-0 right-0 z-50 h-screen
-        w-80  /* fix the right sidebar at 20rem width */
-        bg-gradient-to-br from-purple-700 to-indigo-900
+        w-80 bg-gradient-to-br from-purple-700 to-indigo-900
         text-white p-6 flex flex-col
         transition-transform duration-300 ease-in-out
         ${isOpen ? "translate-x-0" : "translate-x-full"}
-        xl:translate-x-0  /* pinned open at >=1280px */
+        xl:translate-x-0
       `}
     >
       {/* Header */}
@@ -155,7 +180,6 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           <Bell className="w-7 h-7" />
           <span className="text-2xl font-semibold">Notifications</span>
         </div>
-        {/* Close button (hidden on xl) */}
         <Button
           variant="ghost"
           size="icon"
@@ -178,7 +202,11 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
               <li
                 key={notification.id}
                 onClick={() => {
-                  if (notification.type !== "group_join_request") {
+                  // If not a join request or invite, simply mark as read on click.
+                  if (
+                    notification.type !== "group_join_request" &&
+                    notification.type !== "group_invite"
+                  ) {
                     markNotificationAsRead(notification.id);
                   }
                 }}
@@ -190,8 +218,13 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     <Avatar className="w-10 h-10">
-                      <AvatarImage src="/profile.png" alt="Notification Avatar" />
-                      <AvatarFallback>{notification.content.charAt(0)}</AvatarFallback>
+                      <AvatarImage
+                        src="/profile.png"
+                        alt="Notification Avatar"
+                      />
+                      <AvatarFallback>
+                        {notification.content.charAt(0)}
+                      </AvatarFallback>
                     </Avatar>
                     {!notification.read && (
                       <span className="absolute top-0 right-0 block h-3 w-3 rounded-full bg-red-500 border-2 border-white"></span>
@@ -211,8 +244,9 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                   </div>
                 </div>
 
-                {/* Group Join Actions */}
-                {notification.type === "group_join_request" &&
+                {/* If the notification is a join request or an invitation, show action buttons */}
+                {(notification.type === "group_join_request" ||
+                  notification.type === "group_invite") &&
                   !notification.content.toLowerCase().includes("has been") &&
                   currentUserId === notification.user_id && (
                     <div className="flex gap-2 mt-2">
@@ -221,7 +255,11 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                         className="w-full border-green-400 text-green-400 hover:bg-green-500 hover:text-white"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleJoinRequestAction(notification, "accept");
+                          if (notification.type === "group_join_request") {
+                            handleJoinRequestAction(notification, "accept");
+                          } else {
+                            handleInvitationAction(notification, "accept");
+                          }
                         }}
                       >
                         Accept
@@ -231,7 +269,11 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                         className="w-full border-red-400 text-red-400 hover:bg-red-500 hover:text-white"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleJoinRequestAction(notification, "decline");
+                          if (notification.type === "group_join_request") {
+                            handleJoinRequestAction(notification, "decline");
+                          } else {
+                            handleInvitationAction(notification, "decline");
+                          }
                         }}
                       >
                         Reject
