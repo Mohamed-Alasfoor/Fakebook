@@ -1,5 +1,7 @@
+"use client"
+
 import type { User } from "@/types/chat"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 interface UserItemProps {
   user: User
@@ -8,7 +10,7 @@ interface UserItemProps {
 }
 
 export function UserItem({ user, onClick, isSelected }: UserItemProps) {
-  if (!user || !user.name) return null  // ✅ Prevents crashes if user is missing
+  if (!user || !user.name) return null
 
   return (
     <div

@@ -128,8 +128,8 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Add the connection to the in-memory tracker.
-		AddClient(userID, conn, db)
+		// Add the connection to the chat-specific tracker.
+		AddChatClient(userID, conn, db)
 		log.Printf("User %s connected to private chat", userID)
 
 		// Update persistent status to "online".
@@ -139,13 +139,12 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 
 		// Ensure that when the connection closes, we mark the user offline.
 		defer func() {
-			RemoveClient(userID, db)
+			RemoveChatClient(userID, db)
 			log.Printf("User %s disconnected from private chat", userID)
 			if err := MarkUserOffline(db, userID); err != nil {
 				log.Println("Failed to mark user offline:", err)
 			}
 		}()
-		
 
 		// Main loop: read and process messages.
 		for {
@@ -171,8 +170,7 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 
 			// Handle typing indicator messages.
 			if msg.Type == "typing" {
-				// Forward the typing notification to the recipient if online.
-				if client, ok := GetClient(msg.ReceiverID); ok {
+				if client, ok := GetChatClient(msg.ReceiverID); ok {
 					typingNotification := map[string]string{
 						"type":      "typing",
 						"sender_id": userID,
@@ -183,7 +181,7 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 				continue
 			}
 
-			//Enforce a message word limit 
+			// Enforce a message word limit.
 			words := strings.Fields(msg.Message)
 			if len(words) > 200 {
 				errorMsg := map[string]string{"error": "Message cannot exceed 200 words"}
@@ -192,7 +190,7 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 				continue
 			}
 
-			// For regular messages, first verify that private messaging is allowed.
+			// Verify that private messaging is allowed.
 			var allowed bool
 			checkQuery := `
                 SELECT EXISTS(
@@ -217,14 +215,15 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 				log.Println("Database insert error:", err)
 			}
 
-			// If the recipient is online, send the message in real time.
-			if client, ok := GetClient(msg.ReceiverID); ok {
+			// Send the message in real time to the recipient's chat connection.
+			if client, ok := GetChatClient(msg.ReceiverID); ok {
 				sendBytes, _ := json.Marshal(msg)
 				client.Conn.WriteMessage(websocket.TextMessage, sendBytes)
 			}
 		}
 	}
 }
+
 
 // -----------------------------
 // Mark Message as Read Handler

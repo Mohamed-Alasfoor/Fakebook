@@ -4,6 +4,11 @@ import { useState, useEffect } from "react"
 import { UserList } from "@/components/chat/UserList"
 import { ChatWindow } from "@/components/chat/ChatWindow"
 import type { User } from "@/types/chat"
+import { ChatSocketProvider } from "@/lib/ChatSocketProvider"
+
+// For demonstration, we define the logged-in user’s ID here.
+// Replace this with your real user ID from your auth context or cookie.
+const currentUserId = "actualLoggedInUserId"
 
 export default function ChatPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
@@ -21,11 +26,9 @@ export default function ChatPage() {
 
       ws.onmessage = (event) => {
         console.log("📩 WebSocket Message Received:", event.data)
-
         try {
           const receivedUsers = JSON.parse(event.data)
-
-          // ✅ Transform WebSocket data to match expected `User` interface
+          // Format users to match the expected User interface
           const formattedUsers: User[] = receivedUsers.map((user: any) => ({
             id: user.id,
             name: user.nickname || "Unknown User",
@@ -34,7 +37,6 @@ export default function ChatPage() {
               : "/default-avatar.png",
             online: user.online,
           }))
-
           console.log("✅ Formatted Users:", formattedUsers)
           setUsers(formattedUsers)
         } catch (error) {
@@ -44,7 +46,7 @@ export default function ChatPage() {
 
       ws.onerror = (error) => {
         console.error("❌ WebSocket error:", error)
-        setTimeout(connectWebSocket, 5000) // Retry after 5s
+        setTimeout(connectWebSocket, 5000)
       }
 
       ws.onclose = () => {
@@ -59,9 +61,16 @@ export default function ChatPage() {
   }, [])
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <UserList users={users} onSelectUser={setSelectedUser} selectedUser={selectedUser} />
-      <ChatWindow user={selectedUser} />
-    </div>
+    // We pass the currentUserId into our ChatSocketProvider context (if needed)
+    <ChatSocketProvider>
+      <div className="flex h-screen bg-gray-50">
+        <UserList
+          users={users}
+          onSelectUser={setSelectedUser}
+          selectedUser={selectedUser}
+        />
+        <ChatWindow currentUserId={currentUserId} user={selectedUser} />
+      </div>
+    </ChatSocketProvider>
   )
 }

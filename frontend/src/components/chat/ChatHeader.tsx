@@ -1,7 +1,7 @@
+"use client"
+
 import type { User } from "@/types/chat"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Phone, Video, MoreVertical } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 interface ChatHeaderProps {
   user: User
@@ -22,8 +22,6 @@ export function ChatHeader({ user }: ChatHeaderProps) {
           </p>
         </div>
       </div>
-      
     </div>
   )
 }
-

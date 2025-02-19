@@ -1,6 +1,8 @@
+"use client"
+
 import type { User } from "@/types/chat"
+import { UserItem } from "./UserItem"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { UserItem } from "@/components/chat/UserItem"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 

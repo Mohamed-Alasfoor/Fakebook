@@ -15,13 +15,17 @@ import (
 type Client struct {
 	Conn   *websocket.Conn
 	UserID string
+	// You can add additional fields if needed (like connection type)
 }
 
 var (
-	// clients maps user IDs to their active chat connection.
-	clients = make(map[string]*Client)
-	// clientsMutex protects concurrent access to the clients map.
-	clientsMutex sync.RWMutex
+	// chatClients maps user IDs to their active **chat** connection.
+	chatClients   = make(map[string]*Client)
+	chatClientsMu sync.RWMutex
+
+	// onlineClients maps user IDs to their active **online status** connection.
+	onlineClients   = make(map[string]*Client)
+	onlineClientsMu sync.RWMutex
 )
 
 // OnlineUser holds the friend details that will be sent.
@@ -32,39 +36,66 @@ type OnlineUser struct {
 	Online   bool   `json:"online"`
 }
 
-// AddClient registers a new client connection and broadcasts updated status.
-func AddClient(userID string, conn *websocket.Conn, db *sql.DB) {
-	clientsMutex.Lock()
-	clients[userID] = &Client{
+// AddChatClient registers a new private chat connection.
+func AddChatClient(userID string, conn *websocket.Conn, db *sql.DB) {
+	chatClientsMu.Lock()
+	chatClients[userID] = &Client{
 		Conn:   conn,
 		UserID: userID,
 	}
-	clientsMutex.Unlock()
+	chatClientsMu.Unlock()
 	broadcastFriendsStatus(db)
 }
 
-// RemoveClient unregisters a client connection and broadcasts updated status.
-func RemoveClient(userID string, db *sql.DB) {
-	clientsMutex.Lock()
-	delete(clients, userID)
-	clientsMutex.Unlock()
+// RemoveChatClient unregisters a private chat connection.
+func RemoveChatClient(userID string, db *sql.DB) {
+	chatClientsMu.Lock()
+	delete(chatClients, userID)
+	chatClientsMu.Unlock()
 	broadcastFriendsStatus(db)
 }
 
-// GetClient returns the client associated with the given user ID.
-func GetClient(userID string) (*Client, bool) {
-	clientsMutex.RLock()
-	defer clientsMutex.RUnlock()
-	client, ok := clients[userID]
+// GetChatClient returns the chat client associated with the given user ID.
+func GetChatClient(userID string) (*Client, bool) {
+	chatClientsMu.RLock()
+	defer chatClientsMu.RUnlock()
+	client, ok := chatClients[userID]
 	return client, ok
 }
 
-// GetOnlineUsers returns a list of user IDs that are currently online (in‑memory).
+// AddOnlineClient registers a new online status connection.
+func AddOnlineClient(userID string, conn *websocket.Conn, db *sql.DB) {
+	onlineClientsMu.Lock()
+	onlineClients[userID] = &Client{
+		Conn:   conn,
+		UserID: userID,
+	}
+	onlineClientsMu.Unlock()
+	broadcastFriendsStatus(db)
+}
+
+// RemoveOnlineClient unregisters an online status connection.
+func RemoveOnlineClient(userID string, db *sql.DB) {
+	onlineClientsMu.Lock()
+	delete(onlineClients, userID)
+	onlineClientsMu.Unlock()
+	broadcastFriendsStatus(db)
+}
+
+// GetOnlineClient returns the online status client associated with the given user ID.
+func GetOnlineClient(userID string) (*Client, bool) {
+	onlineClientsMu.RLock()
+	defer onlineClientsMu.RUnlock()
+	client, ok := onlineClients[userID]
+	return client, ok
+}
+
+// GetOnlineUsers returns a list of user IDs that are currently online (based on onlineClients).
 func GetOnlineUsers() []string {
-	clientsMutex.RLock()
-	defer clientsMutex.RUnlock()
-	online := make([]string, 0, len(clients))
-	for userID := range clients {
+	onlineClientsMu.RLock()
+	defer onlineClientsMu.RUnlock()
+	online := make([]string, 0, len(onlineClients))
+	for userID := range onlineClients {
 		online = append(online, userID)
 	}
 	return online
@@ -74,22 +105,18 @@ func GetOnlineUsers() []string {
 // Persistent Online Status Functions
 // -----------------------
 
-// MarkUserOnline updates the persistent status of a user to "online".
 func MarkUserOnline(db *sql.DB, userID string) error {
 	_, err := db.Exec(`INSERT OR REPLACE INTO user_status (user_id, status, last_seen) VALUES (?, 'online', ?)`,
 		userID, time.Now().Format(time.RFC3339))
 	return err
 }
 
-// MarkUserOffline updates the persistent status of a user to "offline" and records the last seen time.
 func MarkUserOffline(db *sql.DB, userID string) error {
 	_, err := db.Exec(`INSERT OR REPLACE INTO user_status (user_id, status, last_seen) VALUES (?, 'offline', ?)`,
 		userID, time.Now().Format(time.RFC3339))
 	return err
 }
 
-// getFriendsStatus returns a slice of OnlineUser for a given user.
-// It retrieves users that the given user follows or who follow the given user.
 func getFriendsStatus(db *sql.DB, userID string) ([]OnlineUser, error) {
 	query := `
 		SELECT u.id, u.nickname, u.avatar,
@@ -121,22 +148,19 @@ func getFriendsStatus(db *sql.DB, userID string) ([]OnlineUser, error) {
 	return friends, nil
 }
 
-// broadcastFriendsStatus iterates over each connected client and sends them their friend list.
 func broadcastFriendsStatus(db *sql.DB) {
-	clientsMutex.RLock()
-	defer clientsMutex.RUnlock()
-	for _, client := range clients {
-		// Get personalized friend details for this client.
+	// We'll broadcast using the online status connections.
+	onlineClientsMu.RLock()
+	defer onlineClientsMu.RUnlock()
+	for _, client := range onlineClients {
 		friends, err := getFriendsStatus(db, client.UserID)
 		if err != nil {
 			log.Printf("Error getting friends status for %s: %v", client.UserID, err)
 			continue
 		}
-		// Prepare the message payload.
 		if err := client.Conn.WriteJSON(friends); err != nil {
 			log.Printf("Error broadcasting to client %s: %v", client.UserID, err)
 		}
-		
 	}
 }
 
@@ -158,8 +182,8 @@ func OnlineUsersSocketHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Add the connection and mark user online.
-		AddClient(userID, conn, db)
+		// Add the connection to the online-specific tracker.
+		AddOnlineClient(userID, conn, db)
 		if err := MarkUserOnline(db, userID); err != nil {
 			log.Printf("Failed to mark user online: %v", err)
 		}
@@ -167,7 +191,7 @@ func OnlineUsersSocketHandler(db *sql.DB) http.HandlerFunc {
 		// Keep the connection open.
 		for {
 			if _, _, err := conn.ReadMessage(); err != nil {
-				RemoveClient(userID, db)
+				RemoveOnlineClient(userID, db)
 				if err := MarkUserOffline(db, userID); err != nil {
 					log.Printf("Failed to mark user offline: %v", err)
 				}
