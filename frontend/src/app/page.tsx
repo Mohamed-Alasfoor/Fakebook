@@ -2,14 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import { MainContent } from "@/components/home/mainContent";
 import { checkAuth } from "@/lib/hooks/checkAuth";
 
 export default function Home() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(true); // Notifications sidebar
   const router = useRouter();
 
   useEffect(() => {
@@ -25,11 +22,12 @@ export default function Home() {
   }
 
   return (
-    <div className="relative min-h-screen bg-gray-50">
-
-      {/* Main Content Container with margins to account for both sidebars */}
-      <div className="flex-1 md:ml-64 md:mr-80">
-        <MainContent onOpenSidebar={() => setSidebarOpen(true)} />
+    <div className="py-8 px-4">
+      {/* This container is inside the layout’s max-w-screen-xl, so it stays centered */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <MainContent onOpenSidebar={function (): void {
+          throw new Error("Function not implemented.");
+        } } />
       </div>
     </div>
   );
