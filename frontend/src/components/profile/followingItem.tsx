@@ -16,7 +16,14 @@ export default function FollowingItem({ following }: FollowingProps) {
     <Card>
       <CardContent className="flex items-center gap-4 p-4">
         <Avatar>
-          <AvatarImage src={following.avatar} alt={following.nickname} />
+          <AvatarImage
+            src={
+              following.avatar
+                ? `http://localhost:8080/avatars/${following.avatar}`
+                : "/profile.png"
+            }
+            alt={following.nickname}
+          />
           <AvatarFallback>{following.nickname[0]}</AvatarFallback>
         </Avatar>
         <div className="flex-1">

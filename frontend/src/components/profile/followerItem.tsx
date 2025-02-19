@@ -16,7 +16,14 @@ export default function FollowerItem({ follower }: FollowerProps) {
     <Card>
       <CardContent className="flex items-center gap-4 p-4">
         <Avatar>
-          <AvatarImage src={follower.avatar} alt={follower.nickname} />
+          <AvatarImage
+            src={
+              follower.avatar
+                ? `http://localhost:8080/avatars/${follower.avatar}`
+                : "/profile.png"
+            }
+            alt={follower.nickname}
+          />
           <AvatarFallback>{follower.nickname[0]}</AvatarFallback>
         </Avatar>
         <div className="flex-1">

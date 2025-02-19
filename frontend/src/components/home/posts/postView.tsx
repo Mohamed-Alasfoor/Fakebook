@@ -25,8 +25,8 @@ interface PostViewProps {
 }
 
 export interface Comment {
-  id: string;  // Change id from number to string (UUID)
-  user_id: string;  // Ensure consistency with UUID format
+  id: string; // Change id from number to string (UUID)
+  user_id: string; // Ensure consistency with UUID format
   userProfileImage?: string;
   nickname?: string;
   content: string;
@@ -71,13 +71,11 @@ export function PostView({
         user_id: c.user_id,
         content: c.content,
         created_at: c.created_at,
-        image_url: c.image_url
-          ? `${c.image_url}`
-          : undefined,
+        image_url: c.image_url ? `${c.image_url}` : undefined,
         userProfileImage: c.userProfileImage
           ? `http://localhost:8080/uploads/${c.userProfileImage}`
           : "/profile.png",
-        nickname: c.nickname 
+        nickname: c.nickname,
       }));
 
       setComments(loadedComments);
@@ -110,7 +108,7 @@ export function PostView({
       const formData = new FormData();
       formData.append("post_id", String(post.id));
       formData.append("content", newComment);
-      if (newComment.trim() === ""){
+      if (newComment.trim() === "") {
         setError("Comment cannot be empty.");
         return;
       }
@@ -159,12 +157,13 @@ export function PostView({
         <Avatar>
           <AvatarImage
             src={
-              post.userProfileImage
-                ? `http://localhost:8080/uploads/${post.userProfileImage}`
+              post.avatar
+                ? `http://localhost:8080/avatars/${post.avatar}`
                 : "/profile.png"
             }
             alt={post.nickname}
           />
+
           <AvatarFallback>{post.nickname?.charAt(0)}</AvatarFallback>
         </Avatar>
         <div>
@@ -234,33 +233,32 @@ export function PostView({
           </div>
         )}
 
-     <div className="flex items-center gap-2">
-    <Input
-     placeholder="Write a comment..."
-    value={newComment}
-    onChange={(e) => {
-      const text = e.target.value
-      if (text.length <= 250) {
-        setNewComment(text)
-      }
-    }}
-    disabled={submitting}
-    required
-  />
-  <label className="cursor-pointer">
-    <input
-      type="file"
-      accept="image/*"
-      className="hidden"
-      onChange={handleFileChange}
-    />
-    <ImageIcon className="w-6 h-6 text-gray-500 hover:text-gray-700" />
-  </label>
-  <Button onClick={handleAddComment} disabled={submitting}>
-    <Send className="w-5 h-5" />
-  </Button>
-   </div>
-
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Write a comment..."
+            value={newComment}
+            onChange={(e) => {
+              const text = e.target.value;
+              if (text.length <= 250) {
+                setNewComment(text);
+              }
+            }}
+            disabled={submitting}
+            required
+          />
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <ImageIcon className="w-6 h-6 text-gray-500 hover:text-gray-700" />
+          </label>
+          <Button onClick={handleAddComment} disabled={submitting}>
+            <Send className="w-5 h-5" />
+          </Button>
+        </div>
       </div>
     </div>
   );

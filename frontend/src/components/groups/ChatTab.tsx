@@ -11,6 +11,7 @@ interface ChatMessage {
   sender_id: string;
   message: string;
   created_at: string;
+  avatar?: string;
 }
 
 interface ChatTabProps {
@@ -18,7 +19,7 @@ interface ChatTabProps {
   newMessage: string;
   setNewMessage: (value: string) => void;
   handleSendMessage: () => void;
-  currentUserId: string|undefined;
+  currentUserId: string | undefined;
 }
 
 export default function ChatTab({
@@ -43,7 +44,7 @@ export default function ChatTab({
 
       {/* Messages List - Flexible Height */}
       <ScrollArea className="flex-grow px-4 py-2 overflow-y-auto">
-        {messages===null ? (
+        {messages === null ? (
           <p className="text-center text-gray-500 mt-4">No messages yet.</p>
         ) : (
           messages.map((msg, index) => {
@@ -58,9 +59,17 @@ export default function ChatTab({
                 {!isCurrentUser && (
                   <Avatar className="w-6 h-6">
                     <AvatarImage
-                      src={`https://api.dicebear.com/6.x/initials/svg?seed=${msg.sender_id}`}
+                      src={
+                        // If the message object includes an avatar field, use it (prefixed with your URL); otherwise, use the dicebear fallback.
+                        msg.avatar
+                          ? `http://localhost:8080/avatars/${msg.avatar}`
+                          : `https://api.dicebear.com/6.x/initials/svg?seed=${msg.sender_id}`
+                      }
                     />
-                    <AvatarFallback>{msg.sender_id.slice(0, 2).toUpperCase()}</AvatarFallback>
+
+                    <AvatarFallback>
+                      {msg.sender_id.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
                   </Avatar>
                 )}
 
@@ -72,7 +81,9 @@ export default function ChatTab({
                   }`}
                 >
                   {!isCurrentUser && (
-                    <p className="text-xs font-medium text-gray-600">{msg.sender_id}</p>
+                    <p className="text-xs font-medium text-gray-600">
+                      {msg.sender_id}
+                    </p>
                   )}
                   <p>{msg.message}</p>
                   <p className="text-xs text-right opacity-60">

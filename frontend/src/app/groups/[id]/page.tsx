@@ -346,9 +346,15 @@ export default function GroupView() {
                 {/* If current user is creator, show Delete Group button;
                     otherwise show Leave Group button */}
                 {isCreator ? (
-                  <DeleteGroupButton groupId={group.id} onDelete={() => router.push("/groups")} />
+                  <DeleteGroupButton
+                    groupId={group.id}
+                    onDelete={() => router.push("/groups")}
+                  />
                 ) : (
-                  <LeaveGroupButton groupId={group.id} onLeave={() => router.push("/groups")} />
+                  <LeaveGroupButton
+                    groupId={group.id}
+                    onLeave={() => router.push("/groups")}
+                  />
                 )}
               </div>
             </div>
@@ -407,7 +413,9 @@ export default function GroupView() {
                 <div className="space-y-4">
                   {/* Render each member with an optional remove button if current user is creator */}
                   {isLoadingMembers ? (
-                    <p className="text-center text-gray-500">Loading members...</p>
+                    <p className="text-center text-gray-500">
+                      Loading members...
+                    </p>
                   ) : members.length === 0 ? (
                     <p className="text-center text-gray-500">No members yet.</p>
                   ) : (
@@ -418,15 +426,26 @@ export default function GroupView() {
                       >
                         <div className="flex items-center gap-3">
                           <Avatar className="w-10 h-10">
-                            <AvatarImage src={member.avatar || "/profile.png"} />
-                            <AvatarFallback>{member.first_name[0]}</AvatarFallback>
+                            <AvatarImage
+                              src={
+                                member.avatar
+                                  ? `http://localhost:8080/avatars/${member.avatar}`
+                                  : "/profile.png"
+                              }
+                            />
+                            <AvatarFallback>
+                              {member.first_name[0]}
+                            </AvatarFallback>
                           </Avatar>
+
                           <div>
                             <p className="font-semibold">
                               {member.first_name} {member.last_name}
                             </p>
                             {member.nickname && (
-                              <p className="text-gray-500 text-sm">@{member.nickname}</p>
+                              <p className="text-gray-500 text-sm">
+                                @{member.nickname}
+                              </p>
                             )}
                           </div>
                         </div>

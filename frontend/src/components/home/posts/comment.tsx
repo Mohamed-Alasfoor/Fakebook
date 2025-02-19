@@ -3,22 +3,34 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 interface CommentItemProps {
   comment: Comment;
 }
- interface Comment {
-  id: string;  
-  user_id: string; 
+
+interface Comment {
+  id: string;
+  user_id: string;
   userProfileImage?: string;
   nickname?: string;
   content: string;
   created_at: string;
   image_url?: string;
-  avatar? : string;
+  avatar?: string;
 }
 
 export function CommentItem({ comment }: CommentItemProps) {
+  console.log("Comment data:", comment);
+  // Use comment.avatar if present, otherwise try comment.userProfileImage
+  const avatarSource = comment.avatar || comment.userProfileImage;
+
   return (
     <div className="flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg shadow-sm w-full">
       <Avatar className="w-12 h-12 flex-shrink-0">
-        <AvatarImage  src={`localhost:8080/uploads/${comment.avatar}`} alt={comment.nickname} />
+        <AvatarImage
+          src={
+            avatarSource
+              ? `http://localhost:8080/avatars/${avatarSource}`
+              : "/profile.png"
+          }
+          alt={comment.nickname}
+        />
         <AvatarFallback>{comment.nickname?.charAt(0)}</AvatarFallback>
       </Avatar>
       <div className="flex flex-col bg-gray-100 px-4 py-3 rounded-xl w-full">

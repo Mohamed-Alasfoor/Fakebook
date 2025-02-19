@@ -56,16 +56,16 @@ export default function PostsTab({
               <DialogTitle>Create a Post</DialogTitle>
             </DialogHeader>
             <Textarea
-          placeholder="What's on your mind?"
-          value={postContent}
-          onChange={(e) => {
-            const text = e.target.value;
-            if (text.length <= 500) {
-              setPostContent(text);
-            }
-          }}
-          className="mt-2"
-        />
+              placeholder="What's on your mind?"
+              value={postContent}
+              onChange={(e) => {
+                const text = e.target.value;
+                if (text.length <= 500) {
+                  setPostContent(text);
+                }
+              }}
+              className="mt-2"
+            />
 
             <Input
               type="file"
@@ -99,10 +99,15 @@ export default function PostsTab({
                 {/* User Info Section */}
                 <div className="flex items-center space-x-3">
                   <img
-                    src={post.avatar || "/profile.png"}
+                    src={
+                      post.avatar
+                        ? `http://localhost:8080/avatars/${post.avatar}`
+                        : "/profile.png"
+                    }
                     alt="User Avatar"
                     className="w-12 h-12 rounded-full border border-gray-300 object-cover"
                   />
+
                   <div>
                     <p className="text-md font-semibold text-gray-800">
                       {post.nickname || "Unknown User"}
