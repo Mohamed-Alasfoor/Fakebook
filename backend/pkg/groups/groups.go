@@ -503,23 +503,24 @@ func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
 // HandleInvitationHandler - Accept or Decline an invitation
 func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Only allow PUT requests.
 		if r.Method != http.MethodPut {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
 
-		// Get user ID from session
+		// Get user ID from session (this is the invitee)
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
+		// Parse the request body.
 		var request struct {
 			GroupID string `json:"group_id"`
 			Action  string `json:"action"` // "accept" or "decline"
 		}
-
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
@@ -530,7 +531,7 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Fetch the group creator
+		// Fetch the group creator (to notify them)
 		var creatorID string
 		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&creatorID)
 		if err == sql.ErrNoRows {
@@ -541,14 +542,15 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Handle actions
 		var notificationMessage string
 		if request.Action == "accept" {
+			// Update the membership status to 'member'.
 			_, err = db.Exec(`UPDATE group_membership SET status = 'member' WHERE group_id = ? AND user_id = ? AND status = 'pending_invite'`, request.GroupID, userID)
-			notificationMessage = "A user accepted your group invitation."
+			notificationMessage = "Your invitation to join has been accepted."
 		} else {
+			// Delete the pending invitation.
 			_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'pending_invite'`, request.GroupID, userID)
-			notificationMessage = "A user declined your group invitation."
+			notificationMessage = "Your invitation to join has been declined."
 		}
 
 		if err != nil {
@@ -556,7 +558,14 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Send notification to the group creator
+		// Delete the invitation notification (so it doesn’t show up again)
+		_, err = db.Exec(`DELETE FROM notifications WHERE type = 'group_invite' AND user_id = ? AND group_id = ?`, userID, request.GroupID)
+		if err != nil {
+			http.Error(w, "Failed to delete invitation notification", http.StatusInternalServerError)
+			return
+		}
+
+		// Notify the group creator about the response.
 		err = notifications.CreateNotification(db, creatorID, "group_invite_response",
 			notificationMessage, "", userID, request.GroupID, "")
 		if err != nil {
@@ -567,6 +576,7 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Invitation " + request.Action + "ed successfully"))
 	}
 }
+
 
 // LeaveGroupHandler - Allows users to leave a group
 func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
@@ -844,6 +854,14 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Parse multipart form first
+		const maxUploadSize = 100 << 20 // 100 MB
+		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Now read form values
 		groupID := r.Form.Get("group_id")
 		if groupID == "" {
 			http.Error(w, "Group ID is required", http.StatusBadRequest)
@@ -852,86 +870,63 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 
 		// Check if the user is a member
 		var isMember bool
-		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
-
+		err = db.QueryRow(
+			`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`,
+			groupID, userID,
+		).Scan(&isMember)
 		if err != nil || !isMember {
 			http.Error(w, "Forbidden: Only members can create posts", http.StatusForbidden)
 			return
 		}
 
-		// Parse multipart form (for file uploads)
-		const maxUploadSize = 100 << 20 // 100 MB
-		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
-			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		// Extract form values
+		// Extract content and perform other validations
 		content := r.Form.Get("content")
-
 		if strings.TrimSpace(content) == "" {
-			http.Error(w, "content are required", http.StatusBadRequest)
+			http.Error(w, "Content is required", http.StatusBadRequest)
 			return
 		}
 
 		//word count limit
-		words := strings.Fields(content)
-		if len(words) > 250 {
+		if len(content) > 250 {
 			http.Error(w, "Content cannot exceed 250 words", http.StatusBadRequest)
 			return
 		}
 
-		// Ensure "uploads" directory exists
-		uploadDir := "uploads"
-		if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
-			if err := os.MkdirAll(uploadDir, 0755); err != nil {
-				http.Error(w, "Failed to create upload directory", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		// Handle file upload
+		// Handle file upload (if any)
 		var imageURL string
 		file, fileHeader, err := r.FormFile("file")
-		if err == nil { // File exists
+		if err == nil {
 			defer file.Close()
-
-			// Validate file type
 			allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif"}
 			fileExt := strings.ToLower(filepath.Ext(fileHeader.Filename))
 			if !contains(allowedExtensions, fileExt) {
 				http.Error(w, "Invalid file type. Only JPG, PNG, and GIF allowed.", http.StatusBadRequest)
 				return
 			}
-
-			// Save file with unique name
 			fileName := uuid.New().String() + fileExt
-			savePath := filepath.Join(uploadDir, fileName)
-
+			savePath := filepath.Join("uploads", fileName)
 			outFile, err := os.Create(savePath)
 			if err != nil {
 				http.Error(w, "Failed to save file", http.StatusInternalServerError)
 				return
 			}
 			defer outFile.Close()
-
 			if _, err := io.Copy(outFile, file); err != nil {
 				http.Error(w, "Failed to save file", http.StatusInternalServerError)
 				return
 			}
-
-			// Store only the filename
 			imageURL = fileName
 		} else if err != http.ErrMissingFile {
 			http.Error(w, "Failed to upload file", http.StatusBadRequest)
 			return
 		}
 
-		// Generate post ID
+		// Generate post ID and insert into the database
 		postID := uuid.New().String()
-
-		// Insert into database
-		_, err = db.Exec(`INSERT INTO group_posts (id, group_id, user_id, content, image_url) VALUES (?, ?, ?, ?, ?)`, postID, groupID, userID, content, imageURL)
+		_, err = db.Exec(
+			`INSERT INTO group_posts (id, group_id, user_id, content, image_url) VALUES (?, ?, ?, ?, ?)`,
+			postID, groupID, userID, content, imageURL,
+		)
 		if err != nil {
 			http.Error(w, "Failed to create group post", http.StatusInternalServerError)
 			return
@@ -946,6 +941,7 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 		})
 	}
 }
+
 
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
@@ -1121,9 +1117,8 @@ func CreateGroupPostCommentHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		//word count limit
-		words := strings.Fields(request.Content)
-		if len(words) > 200 {
-			http.Error(w, "Content cannot exceed 200 words", http.StatusBadRequest)
+		if len(request.Content) > 250 {
+			http.Error(w, "Content cannot exceed 250 words", http.StatusBadRequest)
 			return
 		}
 

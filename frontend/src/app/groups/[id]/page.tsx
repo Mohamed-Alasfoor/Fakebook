@@ -1,8 +1,10 @@
+// app/group/[id]/page.tsx (or wherever your GroupView component is located)
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
+import Cookies from "js-cookie";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,12 +19,15 @@ import { MessageCircle, Users, Calendar } from "lucide-react";
 import PostsTab from "@/components/groups/PostsTab";
 import MembersTab from "@/components/groups/MembersTab";
 import EventsTab from "@/components/groups/EventsTab";
+import ChatTab from "@/components/groups/ChatTab";
+import { InviteButton } from "@/components/groups/InviteButton";
+import { LeaveGroupButton } from "@/components/groups/LeaveGroupButton";
+import { DeleteGroupButton } from "@/components/groups/DeleteGroupButton";
+import { RemoveMemberButton } from "@/components/groups/RemoveMemberButton";
 import { Group, Post, Member, Event, RSVPStatus } from "@/types/groupTypes";
 import { useWebSocket } from "@/lib/hooks/use-web-socket";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import ChatTab from "@/components/groups/ChatTab";
-import Cookies from "js-cookie";
 
 interface ChatMessage {
   sender_id: string;
@@ -67,6 +72,7 @@ export default function GroupView() {
     const fetchGroupData = async () => {
       try {
         const groupId = params.id as string;
+        console.log("Fetching group data for groupId:", groupId);
         const [groupResponse, postsResponse, membersResponse, eventsResponse] =
           await Promise.all([
             axios.get(
@@ -95,7 +101,14 @@ export default function GroupView() {
           return;
         }
 
-        setGroup(groupResponse.data);
+        // Debug log the fetched group data
+        console.log("Fetched group data:", groupResponse.data);
+        // Map backend fields if needed:
+        const fetchedGroup: Group = {
+          ...groupResponse.data,
+          id: groupResponse.data.id || groupResponse.data.group_id,
+        };
+        setGroup(fetchedGroup);
         setPosts(postsResponse?.data || []);
         setMembers(membersResponse?.data || []);
         setEvents(eventsResponse?.data || []);
@@ -116,7 +129,6 @@ export default function GroupView() {
     if (!postContent.trim()) {
       return alert("Post content cannot be empty.");
     }
-
     const formData = new FormData();
     formData.append("group_id", params.id as string);
     formData.append("content", postContent);
@@ -220,7 +232,7 @@ export default function GroupView() {
     }
   };
 
-  // --- RSVP Handler (Updated to directly update events array) ---
+  // --- RSVP Handler ---
   const handleRSVP = async (eventId: string, status: "going" | "not going") => {
     try {
       await axios.post(
@@ -229,14 +241,12 @@ export default function GroupView() {
         { withCredentials: true }
       );
 
-      // Update the user_status in the events array directly
       setEvents((prevEvents) =>
         prevEvents.map((ev) =>
           ev.id === eventId ? { ...ev, user_status: status } : ev
         )
       );
 
-      // You can still track RSVPs separately if you want:
       setRsvps((prev) => {
         const existingRSVP = prev.find((rsvp) => rsvp.event_id === eventId);
         if (existingRSVP) {
@@ -255,7 +265,6 @@ export default function GroupView() {
   // --- Fetch Previous Chat Messages ---
   useEffect(() => {
     if (!params?.id) return;
-
     const fetchMessages = async () => {
       try {
         const response = await axios.get(
@@ -267,7 +276,6 @@ export default function GroupView() {
         console.error("Error fetching previous chat messages:", error);
       }
     };
-
     fetchMessages();
   }, [params?.id]);
 
@@ -296,6 +304,12 @@ export default function GroupView() {
     }
   };
 
+  // Determine current user ID from cookies
+  const currentUserId = Cookies.get("user_id");
+
+  // Check if current user is the creator of the group.
+  const isCreator = group?.creator_id === currentUserId;
+
   if (isLoading)
     return (
       <div className="text-center py-10 text-gray-500">
@@ -319,18 +333,28 @@ export default function GroupView() {
                   Created on {new Date(group.created_at).toLocaleDateString()}
                 </CardDescription>
               </div>
-              <Button
-                variant="secondary"
-                className="bg-white text-[#6C5CE7] hover:bg-slate-100"
-                onClick={() => router.push("/groups")}
-              >
-                Back to Groups
-              </Button>
+              <div className="flex gap-4">
+                <Button
+                  variant="secondary"
+                  className="bg-white text-[#6C5CE7] hover:bg-slate-100"
+                  onClick={() => router.push("/groups")}
+                >
+                  Back to Groups
+                </Button>
+                {/* Invite Button */}
+                <InviteButton groupId={group.id} onInviteSuccess={() => {}} />
+                {/* If current user is creator, show Delete Group button;
+                    otherwise show Leave Group button */}
+                {isCreator ? (
+                  <DeleteGroupButton groupId={group.id} onDelete={() => router.push("/groups")} />
+                ) : (
+                  <LeaveGroupButton groupId={group.id} onLeave={() => router.push("/groups")} />
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-6">
             <p className="text-gray-700 mb-6">{group.description}</p>
-
             <Tabs defaultValue="posts" className="w-full">
               <TabsList className="w-full max-w-md grid grid-cols-4 gap-4 mx-auto mb-6">
                 <TabsTrigger value="posts">
@@ -374,16 +398,55 @@ export default function GroupView() {
                   newMessage={newMessage}
                   setNewMessage={setNewMessage}
                   handleSendMessage={handleSendMessage}
-                  currentUserId={Cookies.get("user_id")}
+                  currentUserId={currentUserId}
                 />
               </TabsContent>
 
               {/* Members Tab */}
               <TabsContent value="members">
-                <MembersTab
-                  members={members}
-                  isLoadingMembers={isLoadingMembers}
-                />
+                <div className="space-y-4">
+                  {/* Render each member with an optional remove button if current user is creator */}
+                  {isLoadingMembers ? (
+                    <p className="text-center text-gray-500">Loading members...</p>
+                  ) : members.length === 0 ? (
+                    <p className="text-center text-gray-500">No members yet.</p>
+                  ) : (
+                    members.map((member) => (
+                      <div
+                        key={member.id}
+                        className="flex items-center justify-between p-4 border rounded-lg bg-white shadow-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar className="w-10 h-10">
+                            <AvatarImage src={member.avatar || "/profile.png"} />
+                            <AvatarFallback>{member.first_name[0]}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold">
+                              {member.first_name} {member.last_name}
+                            </p>
+                            {member.nickname && (
+                              <p className="text-gray-500 text-sm">@{member.nickname}</p>
+                            )}
+                          </div>
+                        </div>
+                        {/* Show RemoveMemberButton only if current user is the creator and this member is not the creator */}
+                        {isCreator && member.id !== group.creator_id && (
+                          <RemoveMemberButton
+                            groupId={group.id}
+                            userId={member.id}
+                            onRemove={() => {
+                              // Remove the member from local state after successful removal
+                              setMembers((prev) =>
+                                prev.filter((m) => m.id !== member.id)
+                              );
+                            }}
+                          />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
               </TabsContent>
 
               {/* Events Tab */}

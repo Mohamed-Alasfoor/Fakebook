@@ -234,27 +234,33 @@ export function PostView({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Write a comment..."
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            disabled={submitting}
-            required
-          />
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-            <ImageIcon className="w-6 h-6 text-gray-500 hover:text-gray-700" />
-          </label>
-          <Button onClick={handleAddComment} disabled={submitting}>
-            <Send className="w-5 h-5" />
-          </Button>
-        </div>
+     <div className="flex items-center gap-2">
+    <Input
+     placeholder="Write a comment..."
+    value={newComment}
+    onChange={(e) => {
+      const text = e.target.value
+      if (text.length <= 250) {
+        setNewComment(text)
+      }
+    }}
+    disabled={submitting}
+    required
+  />
+  <label className="cursor-pointer">
+    <input
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={handleFileChange}
+    />
+    <ImageIcon className="w-6 h-6 text-gray-500 hover:text-gray-700" />
+  </label>
+  <Button onClick={handleAddComment} disabled={submitting}>
+    <Send className="w-5 h-5" />
+  </Button>
+   </div>
+
       </div>
     </div>
   );
