@@ -1,3 +1,4 @@
+// app/group/[id]/page.tsx (or wherever your GroupView component is located)
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -20,6 +21,9 @@ import MembersTab from "@/components/groups/MembersTab";
 import EventsTab from "@/components/groups/EventsTab";
 import ChatTab from "@/components/groups/ChatTab";
 import { InviteButton } from "@/components/groups/InviteButton";
+import { LeaveGroupButton } from "@/components/groups/LeaveGroupButton";
+import { DeleteGroupButton } from "@/components/groups/DeleteGroupButton";
+import { RemoveMemberButton } from "@/components/groups/RemoveMemberButton";
 import { Group, Post, Member, Event, RSVPStatus } from "@/types/groupTypes";
 import { useWebSocket } from "@/lib/hooks/use-web-socket";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -99,7 +103,7 @@ export default function GroupView() {
 
         // Debug log the fetched group data
         console.log("Fetched group data:", groupResponse.data);
-        // If your backend returns the ID under a different key, map it here:
+        // Map backend fields if needed:
         const fetchedGroup: Group = {
           ...groupResponse.data,
           id: groupResponse.data.id || groupResponse.data.group_id,
@@ -300,6 +304,12 @@ export default function GroupView() {
     }
   };
 
+  // Determine current user ID from cookies
+  const currentUserId = Cookies.get("user_id");
+
+  // Check if current user is the creator of the group.
+  const isCreator = group?.creator_id === currentUserId;
+
   if (isLoading)
     return (
       <div className="text-center py-10 text-gray-500">
@@ -331,8 +341,15 @@ export default function GroupView() {
                 >
                   Back to Groups
                 </Button>
-                {/* InviteButton receives the group ID from the fetched group */}
+                {/* Invite Button */}
                 <InviteButton groupId={group.id} onInviteSuccess={() => {}} />
+                {/* If current user is creator, show Delete Group button;
+                    otherwise show Leave Group button */}
+                {isCreator ? (
+                  <DeleteGroupButton groupId={group.id} onDelete={() => router.push("/groups")} />
+                ) : (
+                  <LeaveGroupButton groupId={group.id} onLeave={() => router.push("/groups")} />
+                )}
               </div>
             </div>
           </CardHeader>
@@ -381,16 +398,55 @@ export default function GroupView() {
                   newMessage={newMessage}
                   setNewMessage={setNewMessage}
                   handleSendMessage={handleSendMessage}
-                  currentUserId={Cookies.get("user_id")}
+                  currentUserId={currentUserId}
                 />
               </TabsContent>
 
               {/* Members Tab */}
               <TabsContent value="members">
-                <MembersTab
-                  members={members}
-                  isLoadingMembers={isLoadingMembers}
-                />
+                <div className="space-y-4">
+                  {/* Render each member with an optional remove button if current user is creator */}
+                  {isLoadingMembers ? (
+                    <p className="text-center text-gray-500">Loading members...</p>
+                  ) : members.length === 0 ? (
+                    <p className="text-center text-gray-500">No members yet.</p>
+                  ) : (
+                    members.map((member) => (
+                      <div
+                        key={member.id}
+                        className="flex items-center justify-between p-4 border rounded-lg bg-white shadow-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar className="w-10 h-10">
+                            <AvatarImage src={member.avatar || "/profile.png"} />
+                            <AvatarFallback>{member.first_name[0]}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold">
+                              {member.first_name} {member.last_name}
+                            </p>
+                            {member.nickname && (
+                              <p className="text-gray-500 text-sm">@{member.nickname}</p>
+                            )}
+                          </div>
+                        </div>
+                        {/* Show RemoveMemberButton only if current user is the creator and this member is not the creator */}
+                        {isCreator && member.id !== group.creator_id && (
+                          <RemoveMemberButton
+                            groupId={group.id}
+                            userId={member.id}
+                            onRemove={() => {
+                              // Remove the member from local state after successful removal
+                              setMembers((prev) =>
+                                prev.filter((m) => m.id !== member.id)
+                              );
+                            }}
+                          />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
               </TabsContent>
 
               {/* Events Tab */}
