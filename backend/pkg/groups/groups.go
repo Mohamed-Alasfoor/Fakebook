@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -399,44 +400,64 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-			return
-		}
+            http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+            return
+        }
 
-		// Get user ID from session
-		inviterID, err := sessions.GetUserIDFromSession(r)
-		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
+        // Get user ID from session
+        inviterID, err := sessions.GetUserIDFromSession(r)
+        if err != nil {
+            http.Error(w, "Unauthorized", http.StatusUnauthorized)
+            return
+        }
 
-		var invite struct {
-			GroupID string `json:"group_id"`
-			UserID  string `json:"user_id"`
-		}
+        var invite struct {
+            GroupID string `json:"group_id"`
+            UserID  string `json:"user_id"`
+        }
 
-		if err := json.NewDecoder(r.Body).Decode(&invite); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
-		}
+        if err := json.NewDecoder(r.Body).Decode(&invite); err != nil {
+            http.Error(w, "Invalid request body", http.StatusBadRequest)
+            return
+        }
 
-		// Check if the inviter is a member of the group (not just the creator)
-		var isMember bool
-		err = db.QueryRow(`
-					SELECT EXISTS(
-							SELECT 1 FROM group_membership 
-							WHERE group_id = ? AND user_id = ? AND status = 'member'
-					)`, invite.GroupID, inviterID).Scan(&isMember)
+        // Check if group_id is provided
+        if invite.GroupID == "" {
+            log.Printf("Group ID is empty in invite request for user %s", inviterID)
+            http.Error(w, "Group ID is required", http.StatusBadRequest)
+            return
+        }
 
-		if err != nil {
-			http.Error(w, "Failed to check group membership", http.StatusInternalServerError)
-			return
-		}
+        // Check if the inviter is a member of the group (using status retrieval)
+        var status string
+        err = db.QueryRow(`
+            SELECT status FROM group_membership 
+            WHERE group_id = ? AND user_id = ?`, invite.GroupID, inviterID).Scan(&status)
+        if err != nil {
+            log.Printf("Error retrieving membership status for user %s in group %s: %v", inviterID, invite.GroupID, err)
+            http.Error(w, "Failed to retrieve membership status", http.StatusInternalServerError)
+            return
+        }
 
-		if !isMember {
-			http.Error(w, "Unauthorized: Only group members can send invites", http.StatusForbidden)
-			return
-		}
+        // Log the retrieved status
+        log.Printf("Membership status for user %s in group %s: %s", inviterID, invite.GroupID, status)
+
+        if status != "member" {
+            log.Printf("User %s is not a member of group %s (status: %s)", inviterID, invite.GroupID, status)
+            http.Error(w, "Unauthorized: Only group members can send invites", http.StatusForbidden)
+            return
+        }
+
+
+// Log the retrieved status
+log.Printf("Membership status for user %s in group %s: %s", inviterID, invite.GroupID, status)
+
+if status != "member" {
+	log.Printf("User %s is not a member of group %s (status: %s)", inviterID, invite.GroupID, status)
+	http.Error(w, "Unauthorized: Only group members can send invites", http.StatusForbidden)
+	return
+}
+
 
 		// Check if the user is already in the group or has a pending request
 		var existingStatus string
@@ -462,8 +483,8 @@ func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
 
 		// Insert invitation with pending status
 		_, err = db.Exec(`
-					INSERT INTO group_membership (id, group_id, user_id, status) 
-					VALUES (?, ?, ?, 'pending_invite')`, uuid.New().String(), invite.GroupID, invite.UserID)
+			INSERT INTO group_membership (id, group_id, user_id, status) 
+			VALUES (?, ?, ?, 'pending_invite')`, uuid.New().String(), invite.GroupID, invite.UserID)
 		if err != nil {
 			http.Error(w, "Failed to send invitation", http.StatusInternalServerError)
 			return
@@ -481,6 +502,7 @@ func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Invitation sent successfully"))
 	}
 }
+
 
 // HandleInvitationHandler - Accept or Decline an invitation
 func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
