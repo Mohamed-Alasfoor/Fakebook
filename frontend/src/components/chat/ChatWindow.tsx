@@ -1,23 +1,25 @@
-"use client"
+"use client";
 
-import type { User } from "@/types/chat"
-import { ChatHeader } from "./ChatHeader"
-import { MessageList } from "./MessageList"
-import { ChatInput } from "./ChatInput"
+import type { User } from "@/types/chat";
+import { ChatHeader } from "./ChatHeader";
+import { MessageList } from "./MessageList";
+import { ChatInput } from "./ChatInput";
 
 interface ChatWindowProps {
   // Pass down the logged-in user's ID.
-  currentUserId: string
-  user: User | null
+  currentUserId: string;
+  user: User | null;
 }
 
 export function ChatWindow({ currentUserId, user }: ChatWindowProps) {
   if (!user) {
     return (
       <div className="flex-grow flex items-center justify-center bg-gray-50">
-        <p className="text-xl text-gray-400">Select a chat to start messaging</p>
+        <p className="text-xl text-gray-400">
+          Select a chat to start messaging
+        </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -27,5 +29,5 @@ export function ChatWindow({ currentUserId, user }: ChatWindowProps) {
       <MessageList currentUserId={currentUserId} userId={user.id} />
       <ChatInput currentUserId={currentUserId} userId={user.id} />
     </div>
-  )
+  );
 }

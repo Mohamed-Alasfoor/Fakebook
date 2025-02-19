@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import type { User } from "@/types/chat"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import type { User } from "@/types/chat";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface ChatHeaderProps {
-  user: User
+  user: User;
 }
 
 export function ChatHeader({ user }: ChatHeaderProps) {
@@ -17,11 +17,15 @@ export function ChatHeader({ user }: ChatHeaderProps) {
         </Avatar>
         <div>
           <h2 className="text-lg font-semibold text-gray-900">{user.name}</h2>
-          <p className={`text-sm ${user.online ? "text-green-500" : "text-gray-500"}`}>
+          <p
+            className={`text-sm ${
+              user.online ? "text-green-500" : "text-gray-500"
+            }`}
+          >
             {user.online ? "Online" : "Offline"}
           </p>
         </div>
       </div>
     </div>
-  )
+  );
 }

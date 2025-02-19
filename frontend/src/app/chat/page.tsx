@@ -33,9 +33,8 @@ export default function ChatPage() {
             id: user.id,
             name: user.nickname || "Unknown User",
             avatar: user.avatar
-              ? `http://localhost:8080/avatars/${user.avatar}`
+              ? `http://localhost:8080/uploads/avatars/${user.avatar}`
               : "/default-avatar.png",
-
             online: user.online,
           }));
           console.log("✅ Formatted Users:", formattedUsers);
