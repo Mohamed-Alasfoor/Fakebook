@@ -875,8 +875,7 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		//word count limit
-		words := strings.Fields(content)
-		if len(words) > 250 {
+		if len(content) > 250 {
 			http.Error(w, "Content cannot exceed 250 words", http.StatusBadRequest)
 			return
 		}
@@ -1121,8 +1120,7 @@ func CreateGroupPostCommentHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		//word count limit
-		words := strings.Fields(request.Content)
-		if len(words) > 200 {
+		if len(request.Content) > 200 {
 			http.Error(w, "Content cannot exceed 200 words", http.StatusBadRequest)
 			return
 		}

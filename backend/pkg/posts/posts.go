@@ -62,11 +62,10 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
         }
 
       //word count limit
-		   words := strings.Fields(content)
-	    	if len(words) > 250 {
-		    	http.Error(w, "Content cannot exceed 250 words", http.StatusBadRequest)
-		  	return
-		  }
+			if len(content) > 250 {
+				http.Error(w, "Content cannot exceed 250 characters", http.StatusBadRequest)
+				return
+		}
 
         if privacy == "" {
             privacy = "public"

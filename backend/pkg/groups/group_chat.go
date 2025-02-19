@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strings"
 	"sync"
 
 	"social-network/pkg/sessions"
@@ -101,8 +100,7 @@ func GroupChatHandler(db *sql.DB) http.HandlerFunc {
 			msg.GroupID = groupID
 
 			//Enforce a word limit on the message 
-			words := strings.Fields(msg.Message)
-			if len(words) > 200 {
+			if len(msg.Message) > 200 {
 				errorMsg := map[string]string{"error": "Message cannot exceed 200 words"}
 				errorBytes, _ := json.Marshal(errorMsg)
 				conn.WriteMessage(websocket.TextMessage, errorBytes)

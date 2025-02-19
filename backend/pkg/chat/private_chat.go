@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"social-network/pkg/sessions"
@@ -184,8 +183,7 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 			}
 
 			//Enforce a message word limit 
-			words := strings.Fields(msg.Message)
-			if len(words) > 200 {
+			if len(msg.Message) > 200 {
 				errorMsg := map[string]string{"error": "Message cannot exceed 200 words"}
 				errorBytes, _ := json.Marshal(errorMsg)
 				conn.WriteMessage(websocket.TextMessage, errorBytes)
