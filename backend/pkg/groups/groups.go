@@ -854,6 +854,14 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Parse multipart form first
+		const maxUploadSize = 100 << 20 // 100 MB
+		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Now read form values
 		groupID := r.Form.Get("group_id")
 		if groupID == "" {
 			http.Error(w, "Group ID is required", http.StatusBadRequest)
@@ -862,85 +870,61 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 
 		// Check if the user is a member
 		var isMember bool
-		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
-
+		err = db.QueryRow(
+			`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`,
+			groupID, userID,
+		).Scan(&isMember)
 		if err != nil || !isMember {
 			http.Error(w, "Forbidden: Only members can create posts", http.StatusForbidden)
 			return
 		}
 
-		// Parse multipart form (for file uploads)
-		const maxUploadSize = 100 << 20 // 100 MB
-		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
-			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		// Extract form values
+		// Extract content and perform other validations
 		content := r.Form.Get("content")
-
 		if strings.TrimSpace(content) == "" {
-			http.Error(w, "content are required", http.StatusBadRequest)
+			http.Error(w, "Content is required", http.StatusBadRequest)
 			return
 		}
-
-		//word count limit
 		if len(content) > 250 {
-			http.Error(w, "Content cannot exceed 250 words", http.StatusBadRequest)
+			http.Error(w, "Content cannot exceed 250 characters", http.StatusBadRequest)
 			return
 		}
 
-		// Ensure "uploads" directory exists
-		uploadDir := "uploads"
-		if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
-			if err := os.MkdirAll(uploadDir, 0755); err != nil {
-				http.Error(w, "Failed to create upload directory", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		// Handle file upload
+		// Handle file upload (if any)
 		var imageURL string
 		file, fileHeader, err := r.FormFile("file")
-		if err == nil { // File exists
+		if err == nil {
 			defer file.Close()
-
-			// Validate file type
 			allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif"}
 			fileExt := strings.ToLower(filepath.Ext(fileHeader.Filename))
 			if !contains(allowedExtensions, fileExt) {
 				http.Error(w, "Invalid file type. Only JPG, PNG, and GIF allowed.", http.StatusBadRequest)
 				return
 			}
-
-			// Save file with unique name
 			fileName := uuid.New().String() + fileExt
-			savePath := filepath.Join(uploadDir, fileName)
-
+			savePath := filepath.Join("uploads", fileName)
 			outFile, err := os.Create(savePath)
 			if err != nil {
 				http.Error(w, "Failed to save file", http.StatusInternalServerError)
 				return
 			}
 			defer outFile.Close()
-
 			if _, err := io.Copy(outFile, file); err != nil {
 				http.Error(w, "Failed to save file", http.StatusInternalServerError)
 				return
 			}
-
-			// Store only the filename
 			imageURL = fileName
 		} else if err != http.ErrMissingFile {
 			http.Error(w, "Failed to upload file", http.StatusBadRequest)
 			return
 		}
 
-		// Generate post ID
+		// Generate post ID and insert into the database
 		postID := uuid.New().String()
-
-		// Insert into database
-		_, err = db.Exec(`INSERT INTO group_posts (id, group_id, user_id, content, image_url) VALUES (?, ?, ?, ?, ?)`, postID, groupID, userID, content, imageURL)
+		_, err = db.Exec(
+			`INSERT INTO group_posts (id, group_id, user_id, content, image_url) VALUES (?, ?, ?, ?, ?)`,
+			postID, groupID, userID, content, imageURL,
+		)
 		if err != nil {
 			http.Error(w, "Failed to create group post", http.StatusInternalServerError)
 			return
@@ -955,6 +939,7 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 		})
 	}
 }
+
 
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {

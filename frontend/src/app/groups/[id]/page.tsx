@@ -131,25 +131,19 @@ export default function GroupView() {
     if (postFile) formData.append("file", postFile);
 
     try {
-      const response = await axios.post(
-        "http://localhost:8080/groups/posts/create",
-        formData,
-        {
-          withCredentials: true,
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
+      await axios.post("http://localhost:8080/groups/posts/create", formData, {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
-      setPosts([
-        {
-          id: response.data.post_id,
-          user_id: "me",
-          content: postContent,
-          image_url: response.data.image_url,
-          created_at: new Date().toISOString(),
-        },
-        ...posts,
-      ]);
+      // Re-fetch posts after successful creation
+      const postsResponse = await axios.get(
+        `http://localhost:8080/groups/posts?group_id=${params.id}`,
+        { withCredentials: true }
+      );
+      setPosts(postsResponse.data || []);
+
+      // Reset post creation state
       setPostContent("");
       setPostFile(null);
       setIsCreatingPost(false);
