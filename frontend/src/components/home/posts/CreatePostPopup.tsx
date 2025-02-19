@@ -36,20 +36,26 @@ export function CreatePostPopup({
   const [privacy, setPrivacy] = useState("public");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
+  // 1) Character limit & error message
+  const [error, setError] = useState("");
+  const maxChars = 500; // Change as you wish
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setImage(e.target.files[0]);
     }
   };
-  const getFollowers = async ()=>{
-    try{
-      const response = axios.get("http://localhost:8080/followers",{withCredentials:true})
-      console.log((await response).data)
-    }catch(error){
-      console.error("Error fetching followers:", error);
-    }
-  }
 
+  // 2) Character-limit logic in onChange
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value;
+    if (text.length <= maxChars) {
+      setContent(text);
+      setError("");
+    } else {
+      setError(`Content cannot exceed ${maxChars} characters.`);
+    }
+  };
 
   const handleSubmit = async () => {
     try {
@@ -57,7 +63,7 @@ export function CreatePostPopup({
         alert("Content cannot be empty");
         return;
       }
-  
+
       const formData = new FormData();
       formData.append("content", content.trim());
       formData.append("privacy", privacy);
@@ -69,27 +75,26 @@ export function CreatePostPopup({
           formData.append("allowed_users[]", user)
         );
       }
-  
+
       const response = await fetch("http://localhost:8080/posts", {
         method: "POST",
         body: formData,
         credentials: "include",
       });
-  
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to create post");
       }
-  
+
       const result = await response.json();
-  
       alert("Post created successfully!");
-  
-      //  Ensure new post is added to the list properly
+
+      // Ensure new post is added to the list properly
       onCreatePost((prevPosts: any[]) => {
         return Array.isArray(prevPosts) ? [result, ...prevPosts] : [result];
       });
-  
+
       // Reset form
       setContent("");
       setPrivacy("public");
@@ -101,7 +106,6 @@ export function CreatePostPopup({
       alert("Failed to create post. Please try again.");
     }
   };
-  
 
   // Mock user list for demonstration
   const userList = ["User1", "User2", "User3", "User4", "User5"];
@@ -110,17 +114,23 @@ export function CreatePostPopup({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">
-            Create New Post
-          </DialogTitle>
+          <DialogTitle className="text-2xl font-bold">Create New Post</DialogTitle>
         </DialogHeader>
+
         <div className="grid gap-6 py-4">
+          {/* 3) Textarea with char-limit */}
           <Textarea
             placeholder="What's on your mind?"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange}
             className="min-h-[180px] text-lg"
           />
+          {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+          <p className="text-sm text-gray-500">
+            Character count: {content.length}/{maxChars}
+          </p>
+
+          {/* Image Upload */}
           <div className="flex items-center gap-4">
             <Label
               htmlFor="image-upload"
@@ -138,10 +148,10 @@ export function CreatePostPopup({
               onChange={handleImageChange}
               className="hidden"
             />
-            {image && (
-              <span className="text-sm text-gray-500">{image.name}</span>
-            )}
+            {image && <span className="text-sm text-gray-500">{image.name}</span>}
           </div>
+
+          {/* Privacy */}
           <Select value={privacy} onValueChange={setPrivacy}>
             <SelectTrigger className="w-full text-base">
               <SelectValue placeholder="Select privacy" />
@@ -167,6 +177,8 @@ export function CreatePostPopup({
               </SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Private user selection */}
           {privacy === "private" && (
             <div>
               <Label htmlFor="user-select" className="mb-2 block font-medium">
@@ -193,6 +205,7 @@ export function CreatePostPopup({
             </div>
           )}
         </div>
+
         <DialogFooter>
           <Button
             onClick={handleSubmit}

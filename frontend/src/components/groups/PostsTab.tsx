@@ -56,11 +56,17 @@ export default function PostsTab({
               <DialogTitle>Create a Post</DialogTitle>
             </DialogHeader>
             <Textarea
-              placeholder="What's on your mind?"
-              value={postContent}
-              onChange={(e) => setPostContent(e.target.value)}
-              className="mt-2"
-            />
+          placeholder="What's on your mind?"
+          value={postContent}
+          onChange={(e) => {
+            const text = e.target.value;
+            if (text.length <= 500) {
+              setPostContent(text);
+            }
+          }}
+          className="mt-2"
+        />
+
             <Input
               type="file"
               accept="image/*"

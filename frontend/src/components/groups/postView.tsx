@@ -134,21 +134,26 @@ export default function PostView({ post, onClose }: PostViewProps) {
           </div>
 
           {/* Add Comment Section */}
-          <div className="mt-6">
-            <Textarea
-              placeholder="Write a comment..."
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-            />
-            <div className="flex justify-between mt-3">
-              <Button variant="secondary" className="text-gray-600" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button className="bg-[#6C5CE7] text-white" onClick={handleAddComment}>
-                Add Comment
-              </Button>
-            </div>
-          </div>
+       <div className="mt-6">
+         <Textarea
+           placeholder="Write a comment..."
+          value={newComment}
+           onChange={(e) => {
+                 const text = e.target.value;
+             if (text.length <= 250) {
+               setNewComment(text);
+             }
+           }}
+         />
+  <div className="flex justify-between mt-3">
+    <Button variant="secondary" className="text-gray-600" onClick={onClose}>
+      Cancel
+    </Button>
+    <Button className="bg-[#6C5CE7] text-white" onClick={handleAddComment}>
+      Add Comment
+    </Button>
+  </div>
+</div>
         </div>
       </div>
     </div>

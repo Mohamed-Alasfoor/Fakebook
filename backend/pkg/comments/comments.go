@@ -56,8 +56,8 @@ func AddCommentHandler(db *sql.DB) http.HandlerFunc {
         }
 
 				//word count limit
-				if len(content) > 200 {
-					http.Error(w, "Content cannot exceed 200 characters", http.StatusBadRequest)
+				if len(content) > 250 {
+					http.Error(w, "Content cannot exceed 250 characters", http.StatusBadRequest)
 					return
 			}
 

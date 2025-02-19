@@ -62,8 +62,8 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
         }
 
       //word count limit
-			if len(content) > 250 {
-				http.Error(w, "Content cannot exceed 250 characters", http.StatusBadRequest)
+			if len(content) > 500 {
+				http.Error(w, "Content cannot exceed 500 characters", http.StatusBadRequest)
 				return
 		}
 
