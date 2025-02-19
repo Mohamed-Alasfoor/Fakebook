@@ -21,14 +21,12 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Retrieve user_id from cookies
     const storedUserId = Cookies.get("user_id");
     if (storedUserId) {
       setUserId(storedUserId);
     }
   }, []);
 
-  // Fetch user profile data
   const { user, isLoading, isError } = useUserProfile(userId ?? undefined);
 
   const handleLogoutClick = () => {
@@ -51,12 +49,13 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
   return (
     <div
       className={`
-        fixed top-0 left-0 z-50 w-80 h-screen
+        fixed top-0 left-0 z-50 h-screen
+        w-64  /* fix the left sidebar at 16rem width */
         bg-gradient-to-br from-purple-700 to-indigo-900
         text-white p-6 flex flex-col
-        transform transition-transform duration-300 ease-in-out
+        transition-transform duration-300 ease-in-out
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
-        md:translate-x-0
+        xl:translate-x-0  /* pinned open at >=1280px */
       `}
     >
       {/* Header */}
@@ -67,10 +66,11 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
           </div>
           <span className="font-semibold text-lg">Fakebook</span>
         </div>
+        {/* Close button (hidden on xl) */}
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden text-white"
+          className="xl:hidden text-white"
           onClick={onClose}
         >
           <X className="h-6 w-6" />
@@ -107,9 +107,7 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
         {isLoading ? (
           <p className="text-center text-sm">Loading profile...</p>
         ) : isError || !user ? (
-          <p className="text-center text-red-500 text-sm">
-            Error loading profile
-          </p>
+          <p className="text-center text-red-500 text-sm">Error loading profile</p>
         ) : (
           <div
             className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-white/10 rounded-lg"
@@ -124,7 +122,6 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
                 }
                 alt="User Avatar"
               />
-
               <AvatarFallback>{user.nickname?.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
@@ -137,7 +134,10 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
               variant="ghost"
               size="icon"
               className="text-white/70 hover:text-white"
-              onClick={handleLogoutClick}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLogoutClick();
+              }}
             >
               <LogOut className="h-4 w-4" />
               <span className="sr-only">Sign out</span>

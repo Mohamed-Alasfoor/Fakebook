@@ -8,8 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { LeftSidebar } from "@/components/home/leftSideBar";
-import { RightSidebar } from "@/components/Notifications/Sidebar";
 
 export default function SettingsPage() {
   // Prevent hydration mismatches.
@@ -143,8 +141,6 @@ export default function SettingsPage() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      {/* Left Sidebar */}
-      <LeftSidebar isOpen={true} onClose={() => {}} />
 
       {/* Main Content Area */}
       <div className="flex-1 max-w-2xl mx-auto p-4">
@@ -236,9 +232,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Right Sidebar (Notifications) */}
-      <RightSidebar isOpen={true} onClose={() => {}} />
     </div>
   );
 }

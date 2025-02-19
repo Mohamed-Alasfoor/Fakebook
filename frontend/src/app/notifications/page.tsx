@@ -1,14 +1,10 @@
 "use client";
-import React, { useState } from "react";
-import { RightSidebar } from "@/components/Notifications/Sidebar";
+import React from "react";
 
 export default function Notification() {
-  const [isOpen, setIsOpen] = useState(true);
-
   return (
-    <RightSidebar 
-      isOpen={isOpen} 
-      onClose={() => setIsOpen(false)} 
-    />
+    <div className="p-4">
+      <h1 className="text-xl">Notifications Page</h1>
+    </div>
   );
 }

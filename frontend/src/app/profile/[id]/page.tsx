@@ -4,8 +4,6 @@ import { useParams } from "next/navigation"
 import { useUserProfile } from "@/lib/hooks/swr/getUserProfile";
 import ProfileHeader from "@/components/profile/profileHeader";
 import ProfileTabs from "@/components/profile/profileTabs";
-import { LeftSidebar } from "@/components/home/leftSideBar";
-import { useState } from "react";
 
 
 

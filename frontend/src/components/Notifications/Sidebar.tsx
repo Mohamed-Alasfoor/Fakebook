@@ -1,4 +1,3 @@
-// File: src/components/Notifications/Sidebar.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -44,6 +43,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
   const [loading, setLoading] = useState<boolean>(false);
   const currentUserId = Cookies.get("user_id");
 
+  // Fetch notifications
   const fetchNotifications = async () => {
     setLoading(true);
     try {
@@ -140,11 +140,13 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
   return (
     <div
       className={`
-        fixed top-0 right-0 z-50 w-80 h-screen
+        fixed top-0 right-0 z-50 h-screen
+        w-80  /* fix the right sidebar at 20rem width */
         bg-gradient-to-br from-purple-700 to-indigo-900
         text-white p-6 flex flex-col
-        transform transition-transform duration-300 ease-in-out
+        transition-transform duration-300 ease-in-out
         ${isOpen ? "translate-x-0" : "translate-x-full"}
+        xl:translate-x-0  /* pinned open at >=1280px */
       `}
     >
       {/* Header */}
@@ -153,15 +155,17 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           <Bell className="w-7 h-7" />
           <span className="text-2xl font-semibold">Notifications</span>
         </div>
+        {/* Close button (hidden on xl) */}
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden text-white"
+          className="xl:hidden text-white"
           onClick={onClose}
         >
           <X className="w-7 h-7" />
         </Button>
       </div>
+
       {/* Notifications List */}
       <div className="flex-1 overflow-y-auto pr-2">
         {loading ? (
@@ -186,13 +190,8 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     <Avatar className="w-10 h-10">
-                      <AvatarImage
-                        src="/profile.png"
-                        alt="Notification Avatar"
-                      />
-                      <AvatarFallback>
-                        {notification.content.charAt(0)}
-                      </AvatarFallback>
+                      <AvatarImage src="/profile.png" alt="Notification Avatar" />
+                      <AvatarFallback>{notification.content.charAt(0)}</AvatarFallback>
                     </Avatar>
                     {!notification.read && (
                       <span className="absolute top-0 right-0 block h-3 w-3 rounded-full bg-red-500 border-2 border-white"></span>
@@ -211,6 +210,8 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                     </span>
                   </div>
                 </div>
+
+                {/* Group Join Actions */}
                 {notification.type === "group_join_request" &&
                   !notification.content.toLowerCase().includes("has been") &&
                   currentUserId === notification.user_id && (
@@ -242,6 +243,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           </ul>
         )}
       </div>
+
       {/* Footer */}
       <div className="mt-6 pt-4 border-t border-white/20">
         <Button
