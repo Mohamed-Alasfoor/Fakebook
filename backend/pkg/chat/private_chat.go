@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
-
 	"social-network/pkg/sessions"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -103,7 +103,6 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
-
 
 // -----------------------------
 // WebSocket Chat Handler with Persistent Status
@@ -223,7 +222,6 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
 // -----------------------------
 // Mark Message as Read Handler
 // -----------------------------
@@ -291,4 +289,3 @@ func MarkMessageReadHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Message marked as read"))
 	}
 }
-
