@@ -579,6 +579,7 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 
 
 // LeaveGroupHandler - Allows users to leave a group
+// LeaveGroupHandler - Allows users to leave a group
 func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
@@ -602,6 +603,24 @@ func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Check if the user is the creator of the group
+		var creatorID string
+		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&creatorID)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Group not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
+		// Prevent the group creator from leaving the group
+		if creatorID == userID {
+			http.Error(w, "Group creator cannot leave the group", http.StatusForbidden)
+			return
+		}
+
+		// Delete the user's membership if they are not the creator
 		_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member'`, request.GroupID, userID)
 		if err != nil {
 			http.Error(w, "Failed to leave group", http.StatusInternalServerError)
@@ -611,6 +630,7 @@ func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Left group successfully"))
 	}
 }
+
 
 // GetUserGroupsHandler - Fetches groups the user is a member of
 func GetUserGroupsHandler(db *sql.DB) http.HandlerFunc {
