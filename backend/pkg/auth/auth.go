@@ -253,6 +253,15 @@ func LogoutHandler(db *sql.DB) http.HandlerFunc {
 			Secure:   true,
 			SameSite: http.SameSiteStrictMode,
 		})
+		http.SetCookie(w, &http.Cookie{
+			Name:     "user_id",
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteStrictMode,
+		})
 
 		w.Write([]byte("Logout successful"))
 	}
