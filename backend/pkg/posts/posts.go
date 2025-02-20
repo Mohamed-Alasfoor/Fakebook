@@ -67,12 +67,13 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 				return
 		}
 
-        if privacy == "" {
-            privacy = "public"
-        } else if privacy != "public" && privacy != "almost_private" && privacy != "private" {
-            http.Error(w, "Invalid privacy setting", http.StatusBadRequest)
-            return
-        }
+		if privacy == "" {
+			privacy = "public"
+		} else if privacy != "public" && privacy != "almost-private" && privacy != "private" {
+			http.Error(w, "Invalid privacy setting", http.StatusBadRequest)
+			return
+		}
+		
 
         // Ensure the "uploads" directory exists in the current folder
         uploadDir := "uploads" // Relative to the current working directory
@@ -181,32 +182,33 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// SQL query to fetch posts with correct privacy filtering
-		query := `
-			SELECT 
-				posts.id, 
-				posts.user_id, 
-				posts.content, 
-				posts.image_url, 
-				posts.privacy, 
-				posts.likes_count, 
-				posts.comments_count, 
-				posts.created_at, 
-				users.nickname, 
-				users.avatar,
-				EXISTS(SELECT 1 FROM likes WHERE likes.post_id = posts.id AND likes.user_id = ?) AS has_liked
-			FROM posts
-			INNER JOIN users ON posts.user_id = users.id
-			WHERE
-				posts.privacy = 'public'
-				OR (posts.privacy = 'almost_private' AND posts.user_id IN 
-					(SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted'))
-				OR (posts.privacy = 'private' AND (posts.user_id = ? OR posts.id IN 
-					(SELECT post_id FROM post_privacy WHERE user_id = ?)))
-			ORDER BY posts.created_at DESC;
-		`
+		// Updated SQL query in GetPostsHandler:
+query := `
+SELECT 
+	posts.id, 
+	posts.user_id, 
+	posts.content, 
+	posts.image_url, 
+	posts.privacy, 
+	posts.likes_count, 
+	posts.comments_count, 
+	posts.created_at, 
+	users.nickname, 
+	users.avatar,
+	EXISTS(SELECT 1 FROM likes WHERE likes.post_id = posts.id AND likes.user_id = ?) AS has_liked
+FROM posts
+INNER JOIN users ON posts.user_id = users.id
+WHERE
+	posts.privacy = 'public'
+	OR (posts.privacy = 'almost-private' AND (posts.user_id = ? OR posts.user_id IN 
+		(SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted')))
+	OR (posts.privacy = 'private' AND (posts.user_id = ? OR posts.id IN 
+		(SELECT post_id FROM post_privacy WHERE user_id = ?)))
+ORDER BY posts.created_at DESC;
+`
+// And pass the userID 5 times as before:
+rows, err := db.Query(query, userID, userID, userID, userID, userID)
 
-		rows, err := db.Query(query, userID, userID, userID, userID)
 		if err != nil {
 			http.Error(w, "Failed to fetch posts", http.StatusInternalServerError)
 			return
@@ -217,7 +219,7 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var post Post
 			var nickname, avatar string
-			var hasLiked bool // To store whether the user liked the post
+			var hasLiked bool
 
 			if err := rows.Scan(
 				&post.ID, &post.UserID, &post.Content, &post.ImageURL,
@@ -230,7 +232,7 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 
 			post.Nickname = nickname
 			post.Avatar = avatar
-			post.HasLiked = hasLiked // Include the user's like status
+			post.HasLiked = hasLiked
 
 			posts = append(posts, post)
 		}
@@ -239,6 +241,7 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(posts)
 	}
 }
+
 
 
 

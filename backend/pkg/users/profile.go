@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -61,14 +62,18 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
+		log.Printf("[DEBUG] LoggedInUserID: %s, ProfileID: %s", loggedInUserID, profileID)
 
 		// Check if the logged-in user is viewing their own profile
 		isMyProfile := loggedInUserID == profileID
 
 		// Check if the logged-in user is following the profile owner
 		var isFollowing bool
-		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = ? AND status = 'accepted')`,
-			loggedInUserID, profileID).Scan(&isFollowing)
+		err = db.QueryRow(
+			`SELECT EXISTS(SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = ? AND status = 'accepted')`,
+			loggedInUserID, profileID,
+		).Scan(&isFollowing)
+		log.Printf("[DEBUG] isMyProfile: %v, isFollowing: %v", isMyProfile, isFollowing)
 
 		// Fetch profile data
 		var profile UserProfile
@@ -77,7 +82,6 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 			FROM users WHERE id = ?`, profileID).Scan(
 			&profile.ID, &profile.Email, &profile.FirstName, &profile.LastName,
 			&profile.Nickname, &profile.AboutMe, &profile.Avatar, &profile.DateOfBirth, &profile.Private)
-
 		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "User not found", http.StatusNotFound)
 			return
@@ -91,9 +95,10 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 		// Fetch following count
 		db.QueryRow(`SELECT COUNT(*) FROM followers WHERE follower_id = ? AND status = 'accepted'`, profileID).Scan(&profile.FollowingCount)
 
-		// If the profile is private and the requester is NOT the owner or a follower, return limited info
+		// If the profile is private and the requester is NOT the owner or a follower, return limited info.
+		// (You could choose to restrict more information here.)
 		if profile.Private && !isMyProfile && !isFollowing {
-			// Return limited data
+			log.Printf("[DEBUG] Returning limited profile data for private account.")
 			response := struct {
 				ID          string `json:"id"`
 				Nickname    string `json:"nickname"`
@@ -153,11 +158,13 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Fetch user posts
+		// Fetch user posts.
+		// Now, if the viewer is not the owner and not following, fetch only public posts.
 		var query string
 		var postRows *sql.Rows
 
-		if profile.Private && !isMyProfile {
+		if !isMyProfile && !isFollowing {
+			log.Printf("[DEBUG] Viewer is not owner and not following. Fetching only public posts.")
 			query = `
 				SELECT id, user_id, content, image_url, privacy, likes_count, comments_count, created_at, 
 					(SELECT nickname FROM users WHERE id = user_id) AS nickname, 
@@ -165,14 +172,11 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 					EXISTS(SELECT 1 FROM likes WHERE likes.post_id = posts.id AND likes.user_id = ?) AS has_liked
 				FROM posts 
 				WHERE user_id = ? 
-				AND (privacy = 'public' OR privacy = 'almost_private' 
-					OR (privacy = 'private' AND EXISTS 
-						(SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = ? AND status = 'accepted')
-					)
-				)
+				  AND privacy = 'public'
 				ORDER BY created_at DESC`
-			postRows, err = db.Query(query, loggedInUserID, profileID, loggedInUserID, profileID)
+			postRows, err = db.Query(query, loggedInUserID, profileID)
 		} else {
+			log.Printf("[DEBUG] Viewer is owner or following. Fetching all posts.")
 			query = `
 				SELECT id, user_id, content, image_url, privacy, likes_count, comments_count, created_at, 
 					(SELECT nickname FROM users WHERE id = user_id) AS nickname, 
@@ -190,6 +194,7 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer postRows.Close()
 
+		postCount := 0
 		for postRows.Next() {
 			var post posts.Post
 			if err := postRows.Scan(
@@ -199,10 +204,13 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 				http.Error(w, "Failed to parse posts", http.StatusInternalServerError)
 				return
 			}
+			log.Printf("[DEBUG] Fetched post ID: %s, privacy: %s", post.ID, post.Privacy)
 			profile.Posts = append(profile.Posts, post)
+			postCount++
 		}
+		log.Printf("[DEBUG] Total posts fetched: %d", postCount)
 
-		// ✅ **Include isFollowing and isMyProfile in all responses**
+		// Include isFollowing and isMyProfile in all responses
 		response := struct {
 			UserProfile
 			IsFollowing bool `json:"is_following"`
@@ -217,6 +225,9 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(response)
 	}
 }
+
+
+
 
 
 
