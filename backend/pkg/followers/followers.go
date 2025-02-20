@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-  "social-network/pkg/sessions"
-	"github.com/google/uuid"
 	"social-network/pkg/notifications"
+	"social-network/pkg/sessions"
+
+	"github.com/google/uuid"
 )
 
 // FollowHandler handles follow requests
@@ -185,9 +186,10 @@ func UnfollowHandler(db *sql.DB) http.HandlerFunc {
 }
 
 
-// GetFollowersHandler fetches the followers of the logged-in user
+// GetFollowersHandler fetches the followers (with details) for the logged-in user
 func GetFollowersHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Allow only GET requests
 		if r.Method != http.MethodGet {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
@@ -200,27 +202,44 @@ func GetFollowersHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rows, err := db.Query(`SELECT follower_id FROM followers WHERE followed_id = ? AND status = 'accepted'`, userID)
+		// Query to join followers with the users table for detailed info
+		rows, err := db.Query(`
+			SELECT users.id, users.nickname, users.avatar 
+			FROM followers 
+			JOIN users ON followers.follower_id = users.id 
+			WHERE followers.followed_id = ? AND followers.status = 'accepted'
+		`, userID)
 		if err != nil {
 			http.Error(w, "Failed to fetch followers", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
-		var followers []string
+		// Create a slice to hold the follower details
+		var followers []struct {
+			ID       string `json:"id"`
+			Nickname string `json:"nickname"`
+			Avatar   string `json:"avatar"`
+		}
+
 		for rows.Next() {
-			var followerID string
-			if err := rows.Scan(&followerID); err != nil {
+			var follower struct {
+				ID       string `json:"id"`
+				Nickname string `json:"nickname"`
+				Avatar   string `json:"avatar"`
+			}
+			if err := rows.Scan(&follower.ID, &follower.Nickname, &follower.Avatar); err != nil {
 				http.Error(w, "Failed to parse followers", http.StatusInternalServerError)
 				return
 			}
-			followers = append(followers, followerID)
+			followers = append(followers, follower)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(followers)
 	}
 }
+
 
 
 // HandleFollowRequest allows the logged-in user to accept or decline follow requests

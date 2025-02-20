@@ -17,8 +17,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { X, Image, User, Globe, Lock, Users } from "lucide-react";
+import { X, Image, Globe, Lock, Users, User } from "lucide-react";
 import axios from "axios";
+import { useFollowers } from "@/lib/hooks/swr/useFollowers";
+import Cookies from "js-cookie";
 
 interface CreatePostPopupProps {
   isOpen: boolean;
@@ -35,10 +37,13 @@ export function CreatePostPopup({
   const [image, setImage] = useState<File | null>(null);
   const [privacy, setPrivacy] = useState("public");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-
-  // 1) Character limit & error message
   const [error, setError] = useState("");
-  const maxChars = 500; // Change as you wish
+  const maxChars = 500; // Maximum allowed characters
+
+  // Get logged-in user's ID from cookies and fetch real followers
+  const loggedInUserId = Cookies.get("user_id") || "";
+  const { followers, isLoading: followersLoading } =
+    useFollowers(loggedInUserId);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -46,7 +51,6 @@ export function CreatePostPopup({
     }
   };
 
-  // 2) Character-limit logic in onChange
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     if (text.length <= maxChars) {
@@ -90,10 +94,9 @@ export function CreatePostPopup({
       const result = await response.json();
       alert("Post created successfully!");
 
-      // Ensure new post is added to the list properly
-      onCreatePost((prevPosts: any[]) => {
-        return Array.isArray(prevPosts) ? [result, ...prevPosts] : [result];
-      });
+      onCreatePost((prevPosts: any[]) =>
+        Array.isArray(prevPosts) ? [result, ...prevPosts] : [result]
+      );
 
       // Reset form
       setContent("");
@@ -107,18 +110,16 @@ export function CreatePostPopup({
     }
   };
 
-  // Mock user list for demonstration
-  const userList = ["User1", "User2", "User3", "User4", "User5"];
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Create New Post</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">
+            Create New Post
+          </DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-6 py-4">
-          {/* 3) Textarea with char-limit */}
           <Textarea
             placeholder="What's on your mind?"
             value={content}
@@ -148,10 +149,12 @@ export function CreatePostPopup({
               onChange={handleImageChange}
               className="hidden"
             />
-            {image && <span className="text-sm text-gray-500">{image.name}</span>}
+            {image && (
+              <span className="text-sm text-gray-500">{image.name}</span>
+            )}
           </div>
 
-          {/* Privacy */}
+          {/* Privacy Selection */}
           <Select value={privacy} onValueChange={setPrivacy}>
             <SelectTrigger className="w-full text-base">
               <SelectValue placeholder="Select privacy" />
@@ -178,30 +181,51 @@ export function CreatePostPopup({
             </SelectContent>
           </Select>
 
-          {/* Private user selection */}
+          {/* Private user selection using real followers */}
           {privacy === "private" && (
             <div>
-              <Label htmlFor="user-select" className="mb-2 block font-medium">
+              <Label className="mb-2 block font-medium">
                 Select users who can see this post:
               </Label>
-              <Select
-                value={selectedUsers.join(",")}
-                onValueChange={(value) => setSelectedUsers(value.split(","))}
-              >
-                <SelectTrigger id="user-select" className="text-base">
-                  <SelectValue placeholder="Select users" />
-                </SelectTrigger>
-                <SelectContent>
-                  {userList.map((user) => (
-                    <SelectItem key={user} value={user}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-5 w-5" />
-                        <span>{user}</span>
+              {followersLoading ? (
+                <p>Loading followers...</p>
+              ) : (
+                <div className="max-h-60 overflow-y-auto border p-2 rounded space-y-2">
+                  {followers && followers.length > 0 ? (
+                    followers.map((follower: any) => (
+                      <div key={follower.id} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={`follower-${follower.id}`}
+                          className="mr-2"
+                          checked={selectedUsers.includes(follower.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedUsers((prev) => [
+                                ...prev,
+                                follower.id,
+                              ]);
+                            } else {
+                              setSelectedUsers((prev) =>
+                                prev.filter((id) => id !== follower.id)
+                              );
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`follower-${follower.id}`}
+                          className="flex items-center gap-2"
+                        >
+                          <User className="h-5 w-5" />
+                          <span>{follower.nickname}</span>
+                        </label>
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    ))
+                  ) : (
+                    <p>No followers available</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
