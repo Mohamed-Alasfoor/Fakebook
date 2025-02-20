@@ -1,22 +1,20 @@
-"use client";
+"use client"
 
-import { useEffect, useRef, useState } from "react";
-import axios from "axios";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useChatSocket } from "@/lib/ChatSocketProvider";
-import type { ChatMessage } from "@/types/chat";
+import { useEffect, useRef, useState } from "react"
+import axios from "axios"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { useChatSocket } from "@/lib/ChatSocketProvider"
+import type { ChatMessage } from "@/types/chat"
 
 interface MessageListProps {
-  // The logged-in user's ID.
-  currentUserId: string;
-  // The ID of the user we are chatting with.
-  userId: string;
+  currentUserId: string
+  userId: string
 }
 
 export function MessageList({ currentUserId, userId }: MessageListProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [historyMessages, setHistoryMessages] = useState<ChatMessage[]>([]);
-  const { messages: socketMessages } = useChatSocket();
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [historyMessages, setHistoryMessages] = useState<ChatMessage[]>([])
+  const { messages: socketMessages } = useChatSocket()
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -24,47 +22,42 @@ export function MessageList({ currentUserId, userId }: MessageListProps) {
         const res = await axios.get<ChatMessage[]>(
           `http://localhost:8080/chat/history?with=${userId}`,
           { withCredentials: true }
-        );
-        setHistoryMessages(res.data ?? []);
+        )
+        setHistoryMessages(res.data ?? [])
       } catch (error) {
-        console.error("❌ Error fetching messages:", error);
-        setHistoryMessages([]);
+        console.error("❌ Error fetching messages:", error)
+        setHistoryMessages([])
       }
-    };
-    fetchMessages();
-  }, [userId]);
+    }
+    fetchMessages()
+  }, [userId])
 
-  // Filter socket messages relevant to the conversation.
+  // Filter socket messages relevant to the current conversation.
   const filteredSocketMessages = socketMessages.filter(
     (msg) =>
       (msg.sender_id === currentUserId && msg.receiver_id === userId) ||
       (msg.sender_id === userId && msg.receiver_id === currentUserId)
-  );
+  )
 
-  // Merge history and socket messages and sort by timestamp.
+  // Merge history and socket messages, then sort by timestamp.
   const mergedMessages = [...historyMessages, ...filteredSocketMessages].sort(
-    (a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [mergedMessages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [mergedMessages])
 
   return (
     <ScrollArea className="flex-grow p-6">
       {mergedMessages.length === 0 ? (
-        <p className="text-center text-gray-400">
-          No messages yet. Start the conversation!
-        </p>
+        <p className="text-center text-gray-400">No messages yet. Start the conversation!</p>
       ) : (
         mergedMessages.map((message) => (
           <div
             key={message.id}
             className={`flex mb-4 ${
-              message.sender_id === currentUserId
-                ? "justify-end"
-                : "justify-start"
+              message.sender_id === currentUserId ? "justify-end" : "justify-start"
             }`}
           >
             <div
@@ -84,5 +77,5 @@ export function MessageList({ currentUserId, userId }: MessageListProps) {
       )}
       <div ref={messagesEndRef} />
     </ScrollArea>
-  );
+  )
 }

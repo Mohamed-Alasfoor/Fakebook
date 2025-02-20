@@ -70,10 +70,12 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (ws && ws.readyState === WebSocket.OPEN) {
       const message = {
         ...msg,
-        id: "", // The backend assigns an ID.
+        id: Date.now().toString(), // Temporary ID; backend may override it later.
         created_at: new Date().toISOString(),
       }
       ws.send(JSON.stringify(message))
+      // Immediately add the message to local state so it's visible in the UI.
+      setMessages((prev) => [...prev, message])
     } else {
       console.error("WebSocket is not connected.")
     }
