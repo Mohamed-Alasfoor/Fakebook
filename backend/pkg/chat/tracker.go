@@ -119,34 +119,38 @@ func MarkUserOffline(db *sql.DB, userID string) error {
 
 func getFriendsStatus(db *sql.DB, userID string) ([]OnlineUser, error) {
 	query := `
-		SELECT u.id, u.nickname, u.avatar,
+		SELECT DISTINCT u.id, u.nickname, u.avatar,
 			CASE WHEN us.status = 'online' THEN 1 ELSE 0 END AS online
 		FROM users u
 		LEFT JOIN user_status us ON u.id = us.user_id
-		WHERE u.id IN (
-			SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted'
-			UNION
-			SELECT follower_id FROM followers WHERE followed_id = ? AND status = 'accepted'
+		WHERE (
+			u.id IN (
+				SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted'
+				UNION
+				SELECT follower_id FROM followers WHERE followed_id = ? AND status = 'accepted'
+			)
 		)
+		OR (u.private = 0 AND u.id != ?)
 	`
-	rows, err := db.Query(query, userID, userID)
+	rows, err := db.Query(query, userID, userID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var friends []OnlineUser
+	var users []OnlineUser
 	for rows.Next() {
-		var friend OnlineUser
+		var user OnlineUser
 		var onlineInt int
-		if err := rows.Scan(&friend.ID, &friend.Nickname, &friend.Avatar, &onlineInt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Nickname, &user.Avatar, &onlineInt); err != nil {
 			return nil, err
 		}
-		friend.Online = onlineInt == 1
-		friends = append(friends, friend)
+		user.Online = onlineInt == 1
+		users = append(users, user)
 	}
-	return friends, nil
+	return users, nil
 }
+
 
 func broadcastFriendsStatus(db *sql.DB) {
 	// We'll broadcast using the online status connections.
