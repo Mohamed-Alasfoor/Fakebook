@@ -168,39 +168,59 @@ func broadcastFriendsStatus(db *sql.DB) {
 	}
 }
 
-// OnlineUsersSocketHandler upgrades the connection and sends real-time friend status updates.
+const (
+    pongWait   = 60 * time.Second
+    pingPeriod = (pongWait * 9) / 10
+)
+
 func OnlineUsersSocketHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Upgrade the HTTP connection to a WebSocket.
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			http.Error(w, "Failed to upgrade connection", http.StatusInternalServerError)
-			return
-		}
+    return func(w http.ResponseWriter, r *http.Request) {
+        conn, err := upgrader.Upgrade(w, r, nil)
+        if err != nil {
+            http.Error(w, "Failed to upgrade connection", http.StatusInternalServerError)
+            return
+        }
+        // Retrieve user ID from session.
+        userID, err := sessions.GetUserIDFromSession(r)
+        if err != nil {
+            conn.WriteMessage(websocket.TextMessage, []byte("Unauthorized"))
+            conn.Close()
+            return
+        }
+        // Set initial read deadline and define pong handler.
+        conn.SetReadDeadline(time.Now().Add(pongWait))
+        conn.SetPongHandler(func(appData string) error {
+            conn.SetReadDeadline(time.Now().Add(pongWait))
+            return nil
+        })
 
-		// Retrieve user ID from session.
-		userID, err := sessions.GetUserIDFromSession(r)
-		if err != nil {
-			conn.WriteMessage(websocket.TextMessage, []byte("Unauthorized"))
-			conn.Close()
-			return
-		}
+        AddOnlineClient(userID, conn, db)
+        if err := MarkUserOnline(db, userID); err != nil {
+            log.Printf("Failed to mark user online: %v", err)
+        }
 
-		// Add the connection to the online-specific tracker.
-		AddOnlineClient(userID, conn, db)
-		if err := MarkUserOnline(db, userID); err != nil {
-			log.Printf("Failed to mark user online: %v", err)
-		}
+        // Start ticker to send periodic pings.
+        ticker := time.NewTicker(pingPeriod)
+        defer ticker.Stop()
 
-		// Keep the connection open.
-		for {
-			if _, _, err := conn.ReadMessage(); err != nil {
-				RemoveOnlineClient(userID, db)
-				if err := MarkUserOffline(db, userID); err != nil {
-					log.Printf("Failed to mark user offline: %v", err)
-				}
-				break
-			}
-		}
-	}
+        go func() {
+            for range ticker.C {
+                if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+                    return
+                }
+            }
+        }()
+
+        // Read loop: this will unblock if a ping/pong fails.
+        for {
+            if _, _, err := conn.ReadMessage(); err != nil {
+                RemoveOnlineClient(userID, db)
+                if err := MarkUserOffline(db, userID); err != nil {
+                    log.Printf("Failed to mark user offline: %v", err)
+                }
+                break
+            }
+        }
+    }
 }
+

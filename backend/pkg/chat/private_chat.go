@@ -109,118 +109,150 @@ var upgrader = websocket.Upgrader{
 // -----------------------------
 
 // PrivateChatHandler handles the private chat WebSocket connection.
+
 func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Upgrade the HTTP connection to a WebSocket.
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Println("WebSocket upgrade error:", err)
-			return
-		}
-		defer conn.Close()
+    return func(w http.ResponseWriter, r *http.Request) {
+        // Upgrade connection
+        conn, err := upgrader.Upgrade(w, r, nil)
+        if err != nil {
+            log.Printf("[PrivateChat] Upgrade error: %v", err)
+            return
+        }
+        defer func() {
+            log.Printf("[PrivateChat] Closing connection")
+            conn.Close()
+        }()
 
-		// Retrieve the user ID from the session.
-		userID, err := sessions.GetUserIDFromSession(r)
-		if err != nil {
-			conn.WriteMessage(websocket.TextMessage, []byte("Unauthorized"))
-			return
-		}
+        // Retrieve user ID
+       	userID, err := sessions.GetUserIDFromSession(r)
 
-		// Add the connection to the chat-specific tracker.
-		AddChatClient(userID, conn, db)
-		log.Printf("User %s connected to private chat", userID)
+        if err != nil {
+            log.Printf("[PrivateChat] Session error: %v", err,userID)
+            conn.WriteMessage(websocket.TextMessage, []byte("Unauthorized"))
+            return
+        }
+        log.Printf("[PrivateChat] User %s connected", userID)
+        AddChatClient(userID, conn, db)
+        if err := MarkUserOnline(db, userID); err != nil {
+            log.Printf("[PrivateChat] MarkUserOnline error for user %s: %v", userID, err)
+        }
+        defer func() {
+            RemoveChatClient(userID, db)
+            if err := MarkUserOffline(db, userID); err != nil {
+                log.Printf("[PrivateChat] MarkUserOffline error for user %s: %v", userID, err)
+            }
+            log.Printf("[PrivateChat] User %s disconnected", userID)
+        }()
 
-		// Update persistent status to "online".
-		if err := MarkUserOnline(db, userID); err != nil {
-			log.Println("Failed to mark user online:", err)
-		}
+        // Set read deadline and pong handler
+        conn.SetReadDeadline(time.Now().Add(pongWait))
+        conn.SetPongHandler(func(appData string) error {
+            log.Printf("[PrivateChat] Received pong from user %s: %s", userID, appData)
+            conn.SetReadDeadline(time.Now().Add(pongWait))
+            return nil
+        })
 
-		// Ensure that when the connection closes, we mark the user offline.
-		defer func() {
-			RemoveChatClient(userID, db)
-			log.Printf("User %s disconnected from private chat", userID)
-			if err := MarkUserOffline(db, userID); err != nil {
-				log.Println("Failed to mark user offline:", err)
-			}
-		}()
+        // Start ticker to send pings periodically
+        ticker := time.NewTicker(pingPeriod)
+        defer ticker.Stop()
+        go func() {
+            for t := range ticker.C {
+                log.Printf("[PrivateChat] Sending ping to user %s at %s", userID, t.Format(time.RFC3339))
+                if err := conn.WriteMessage(websocket.PingMessage, []byte("ping")); err != nil {
+                    log.Printf("[PrivateChat] Ping error for user %s: %v", userID, err)
+                    return
+                }
+            }
+        }()
 
-		// Main loop: read and process messages.
-		for {
-			msgType, msgBytes, err := conn.ReadMessage()
-			if err != nil {
-				log.Println("Read message error:", err)
-				break
-			}
-			if msgType != websocket.TextMessage {
-				continue
-			}
+        // Main read loop
+        for {
+            msgType, msgBytes, err := conn.ReadMessage()
+            if err != nil {
+                log.Printf("[PrivateChat] Read error for user %s: %v", userID, err)
+                break
+            }
+            log.Printf("[PrivateChat] Received message from user %s: type=%d, payload=%s", userID, msgType, string(msgBytes))
+            if msgType != websocket.TextMessage {
+                log.Printf("[PrivateChat] Ignoring non-text message from user %s", userID)
+                continue
+            }
 
-			var msg ChatMessage
-			if err := json.Unmarshal(msgBytes, &msg); err != nil {
-				log.Println("JSON unmarshal error:", err)
-				continue
-			}
+            var msg ChatMessage
+            if err := json.Unmarshal(msgBytes, &msg); err != nil {
+                log.Printf("[PrivateChat] JSON unmarshal error for user %s: %v", userID, err)
+                continue
+            }
+            // Override sender fields
+            msg.SenderID = userID
+            msg.ID = uuid.New().String()
+            msg.CreatedAt = time.Now().Format(time.RFC3339)
 
-			// Force the sender to be the current user.
-			msg.SenderID = userID
-			msg.ID = uuid.New().String()
-			msg.CreatedAt = time.Now().Format(time.RFC3339)
+            // Handle typing notifications
+            if msg.Type == "typing" {
+                if client, ok := GetChatClient(msg.ReceiverID); ok {
+                    typingNotification := map[string]string{
+                        "type":      "typing",
+                        "sender_id": userID,
+                    }
+                    notifBytes, _ := json.Marshal(typingNotification)
+                    log.Printf("[PrivateChat] Sending typing notification from %s to %s", userID, msg.ReceiverID)
+                    client.Conn.WriteMessage(websocket.TextMessage, notifBytes)
+                } else {
+                    log.Printf("[PrivateChat] No active client for receiver %s", msg.ReceiverID)
+                }
+                continue
+            }
 
-			// Handle typing indicator messages.
-			if msg.Type == "typing" {
-				if client, ok := GetChatClient(msg.ReceiverID); ok {
-					typingNotification := map[string]string{
-						"type":      "typing",
-						"sender_id": userID,
-					}
-					notifBytes, _ := json.Marshal(typingNotification)
-					client.Conn.WriteMessage(websocket.TextMessage, notifBytes)
-				}
-				continue
-			}
+            // Enforce word limit
+            words := strings.Fields(msg.Message)
+            if len(words) > 200 {
+                errorMsg := map[string]string{"error": "Message cannot exceed 200 words"}
+                errorBytes, _ := json.Marshal(errorMsg)
+                log.Printf("[PrivateChat] Message from user %s exceeds word limit", userID)
+                conn.WriteMessage(websocket.TextMessage, errorBytes)
+                continue
+            }
 
-			// Enforce a message word limit.
-			words := strings.Fields(msg.Message)
-			if len(words) > 200 {
-				errorMsg := map[string]string{"error": "Message cannot exceed 200 words"}
-				errorBytes, _ := json.Marshal(errorMsg)
-				conn.WriteMessage(websocket.TextMessage, errorBytes)
-				continue
-			}
-
-			// Verify that private messaging is allowed.
-			var allowed bool
-			checkQuery := `
+            // Check if messaging is allowed
+            var allowed bool
+            checkQuery := `
                 SELECT EXISTS(
                     SELECT 1 FROM followers 
                     WHERE (follower_id = ? AND followed_id = ? AND status = 'accepted')
                        OR (follower_id = ? AND followed_id = ? AND status = 'accepted')
                 )
             `
-			if err := db.QueryRow(checkQuery, userID, msg.ReceiverID, msg.ReceiverID, userID).Scan(&allowed); err != nil || !allowed {
-				errorMsg := map[string]string{"error": "Chat not permitted: you must follow each other (or be followed) to chat."}
-				errorBytes, _ := json.Marshal(errorMsg)
-				conn.WriteMessage(websocket.TextMessage, errorBytes)
-				continue
-			}
+            if err := db.QueryRow(checkQuery, userID, msg.ReceiverID, msg.ReceiverID, userID).Scan(&allowed); err != nil || !allowed {
+                errorMsg := map[string]string{"error": "Chat not permitted: you must follow each other to chat."}
+                errorBytes, _ := json.Marshal(errorMsg)
+                log.Printf("[PrivateChat] Chat not permitted: user %s -> %s", userID, msg.ReceiverID)
+                conn.WriteMessage(websocket.TextMessage, errorBytes)
+                continue
+            }
 
-			// Store the message in the database.
-			_, err = db.Exec(`
+            // Store message in DB
+            _, err = db.Exec(`
                 INSERT INTO private_chat_messages (id, sender_id, receiver_id, message, created_at)
                 VALUES (?, ?, ?, ?, ?)
             `, msg.ID, userID, msg.ReceiverID, msg.Message, msg.CreatedAt)
-			if err != nil {
-				log.Println("Database insert error:", err)
-			}
+            if err != nil {
+                log.Printf("[PrivateChat] DB insert error for user %s: %v", userID, err)
+            }
 
-			// Send the message in real time to the recipient's chat connection.
-			if client, ok := GetChatClient(msg.ReceiverID); ok {
-				sendBytes, _ := json.Marshal(msg)
-				client.Conn.WriteMessage(websocket.TextMessage, sendBytes)
-			}
-		}
-	}
+            // Forward message to recipient if connected
+            if client, ok := GetChatClient(msg.ReceiverID); ok {
+                sendBytes, _ := json.Marshal(msg)
+                log.Printf("[PrivateChat] Forwarding message from %s to %s", userID, msg.ReceiverID)
+                client.Conn.WriteMessage(websocket.TextMessage, sendBytes)
+            } else {
+                log.Printf("[PrivateChat] Receiver %s not connected", msg.ReceiverID)
+            }
+        }
+    }
 }
+
+
 
 // -----------------------------
 // Mark Message as Read Handler
