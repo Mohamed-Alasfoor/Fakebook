@@ -40,7 +40,7 @@ export function CommentItem({ comment }: CommentItemProps) {
             {new Date(comment.created_at).toLocaleString()}
           </p>
         </div>
-        <p className="text-gray-800 text-sm leading-relaxed ">
+        <p className="text-gray-800 text-sm leading-relaxed break-words whitespace-pre-wrap">
           {comment.content}
         </p>
         {comment.image_url && (

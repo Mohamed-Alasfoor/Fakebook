@@ -175,7 +175,9 @@ export function PostView({
       </div>
 
       {/* Post Content */}
-      <p className="text-gray-600 mb-4">{post.content}</p>
+      <p className="text-gray-600 mb-4 break-words whitespace-pre-wrap">
+        {post.content}
+      </p>
 
       {post.image_url && (
         <img
