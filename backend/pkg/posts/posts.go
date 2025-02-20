@@ -60,51 +60,42 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
             http.Error(w, "Content cannot be empty", http.StatusBadRequest)
             return
         }
+        if len(content) > 500 {
+            http.Error(w, "Content cannot exceed 500 characters", http.StatusBadRequest)
+            return
+        }
 
-      //word count limit
-			if len(content) > 500 {
-				http.Error(w, "Content cannot exceed 500 characters", http.StatusBadRequest)
-				return
-		}
+        if privacy == "" {
+            privacy = "public"
+        } else if privacy != "public" && privacy != "almost-private" && privacy != "private" {
+            http.Error(w, "Invalid privacy setting", http.StatusBadRequest)
+            return
+        }
 
-		if privacy == "" {
-			privacy = "public"
-		} else if privacy != "public" && privacy != "almost-private" && privacy != "private" {
-			http.Error(w, "Invalid privacy setting", http.StatusBadRequest)
-			return
-		}
-		
-
-        // Ensure the "uploads" directory exists in the current folder
-        uploadDir := "uploads" // Relative to the current working directory
+        // Ensure the "uploads" directory exists
+        uploadDir := "uploads"
         if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
-            err = os.MkdirAll(uploadDir, 0755) // Create directory with proper permissions
-            if err != nil {
+            if err = os.MkdirAll(uploadDir, 0755); err != nil {
                 log.Printf("Failed to create upload directory: %v", err)
                 http.Error(w, "Failed to create upload directory", http.StatusInternalServerError)
                 return
             }
         }
 
-        // Handle file upload
+        // Handle file upload (optional)
         var imageURL string
         file, fileHeader, err := r.FormFile("file")
-        if err == nil { // File exists
+        if err == nil { // file exists
             defer file.Close()
-
-            // Validate the file type
             allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif"}
             fileExt := strings.ToLower(filepath.Ext(fileHeader.Filename))
             if !contains(allowedExtensions, fileExt) {
                 http.Error(w, "Invalid file type. Only .jpg, .jpeg, .png, and .gif are allowed.", http.StatusBadRequest)
                 return
             }
-
-            // Save the file to the "uploads" directory with a unique name
             fileName := uuid.New().String() + fileExt
             savePath := filepath.Join(uploadDir, fileName)
-            log.Printf("Saving file to: %s", savePath) // Log the save path for debugging
-
+            log.Printf("Saving file to: %s", savePath)
             outFile, err := os.Create(savePath)
             if err != nil {
                 log.Printf("Failed to create file: %v", err)
@@ -112,14 +103,11 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
                 return
             }
             defer outFile.Close()
-
             if _, err := io.Copy(outFile, file); err != nil {
                 log.Printf("Failed to copy file: %v", err)
                 http.Error(w, "Failed to save file", http.StatusInternalServerError)
                 return
             }
-
-            // Store only the file name in the database
             imageURL = fileName
         } else if err != http.ErrMissingFile {
             http.Error(w, "Failed to upload file: "+err.Error(), http.StatusBadRequest)
@@ -140,6 +128,19 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
             return
         }
 
+        // If privacy is private, handle allowed users
+        if privacy == "private" {
+            // Retrieve allowed users from the form (should be sent as allowed_users[])
+            allowedUsers := r.Form["allowed_users[]"]
+            for _, allowedUserID := range allowedUsers {
+                _, err := db.Exec("INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)", postID, allowedUserID)
+                if err != nil {
+                    http.Error(w, "Failed to set allowed users", http.StatusInternalServerError)
+                    return
+                }
+            }
+        }
+
         // Build the response
         response := map[string]interface{}{
             "message":   "Post created successfully",
@@ -154,6 +155,7 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
         json.NewEncoder(w).Encode(response)
     }
 }
+
 
 
 // Helper function to check if a slice contains a string
@@ -182,8 +184,7 @@ func GetPostsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Updated SQL query in GetPostsHandler:
-query := `
+		query := `
 SELECT 
 	posts.id, 
 	posts.user_id, 
@@ -200,15 +201,16 @@ FROM posts
 INNER JOIN users ON posts.user_id = users.id
 WHERE
 	posts.privacy = 'public'
-	OR (posts.privacy = 'almost-private' AND (posts.user_id = ? OR posts.user_id IN 
-		(SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted')))
-	OR (posts.privacy = 'private' AND (posts.user_id = ? OR posts.id IN 
-		(SELECT post_id FROM post_privacy WHERE user_id = ?)))
+	OR (posts.privacy = 'almost-private' AND (posts.user_id = ? OR EXISTS(
+	    SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = posts.user_id AND status = 'accepted'
+	)))
+	OR (posts.privacy = 'private' AND (posts.user_id = ? OR EXISTS(
+	    SELECT 1 FROM post_privacy WHERE post_id = posts.id AND user_id = ?
+	)))
 ORDER BY posts.created_at DESC;
 `
-// And pass the userID 5 times as before:
-rows, err := db.Query(query, userID, userID, userID, userID, userID)
-
+		// Pass the userID 5 times as needed:
+		rows, err := db.Query(query, userID, userID, userID, userID, userID)
 		if err != nil {
 			http.Error(w, "Failed to fetch posts", http.StatusInternalServerError)
 			return
@@ -229,11 +231,9 @@ rows, err := db.Query(query, userID, userID, userID, userID, userID)
 				http.Error(w, "Failed to parse posts", http.StatusInternalServerError)
 				return
 			}
-
 			post.Nickname = nickname
 			post.Avatar = avatar
 			post.HasLiked = hasLiked
-
 			posts = append(posts, post)
 		}
 
@@ -241,6 +241,7 @@ rows, err := db.Query(query, userID, userID, userID, userID, userID)
 		json.NewEncoder(w).Encode(posts)
 	}
 }
+
 
 
 
