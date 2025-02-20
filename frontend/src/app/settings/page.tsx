@@ -32,6 +32,8 @@ export default function SettingsPage() {
   const [avatarPreview, setAvatarPreview] = useState(""); // URL for image preview
   const [isPrivate, setIsPrivate] = useState(false);
   const [message, setMessage] = useState("");
+  // New state to track the type of message: "success" or "error"
+  const [messageType, setMessageType] = useState<"success" | "error" | "">("");
 
   // When user data is fetched, update local state.
   useEffect(() => {
@@ -65,6 +67,7 @@ export default function SettingsPage() {
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("");
+    setMessageType("");
     try {
       if (avatarFile) {
         const formData = new FormData();
@@ -95,9 +98,9 @@ export default function SettingsPage() {
         );
       }
       setMessage("Profile updated successfully!");
+      setMessageType("success");
       refreshUser();
     } catch (err: any) {
-      console.error(err);
       if (
         err.response &&
         err.response.data &&
@@ -108,12 +111,14 @@ export default function SettingsPage() {
       } else {
         setMessage("Error updating profile.");
       }
+      setMessageType("error");
     }
   };
 
   // Handler for toggling privacy.
   const handleTogglePrivacy = async () => {
     setMessage("");
+    setMessageType("");
     try {
       await axios.put(
         "http://localhost:8080/users/profile/privacy",
@@ -122,10 +127,12 @@ export default function SettingsPage() {
       );
       setIsPrivate(!isPrivate);
       setMessage("Privacy setting updated!");
+      setMessageType("success");
       refreshUser();
     } catch (err: any) {
       console.error(err);
       setMessage("Error updating privacy setting.");
+      setMessageType("error");
     }
   };
 
@@ -141,7 +148,6 @@ export default function SettingsPage() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-
       {/* Main Content Area */}
       <div className="flex-1 max-w-2xl mx-auto p-4">
         <Card>
@@ -228,7 +234,15 @@ export default function SettingsPage() {
               </Button>
             </div>
 
-            {message && <p className="mt-4 text-green-600">{message}</p>}
+            {message && (
+              <p
+                className={`mt-4 ${
+                  messageType === "error" ? "text-red-600" : "text-green-600"
+                }`}
+              >
+                {message}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
