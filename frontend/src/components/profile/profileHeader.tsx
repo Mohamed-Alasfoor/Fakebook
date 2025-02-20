@@ -1,3 +1,6 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +12,8 @@ interface ProfileHeaderProps {
 }
 
 export default function ProfileHeader({ user }: ProfileHeaderProps) {
+  const router = useRouter();
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -100,7 +105,11 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
             </div>
           </div>
           {user.is_my_profile ? (
-            <Button variant="outline" className="mt-4">
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => router.push("/settings")}
+            >
               Edit Profile
             </Button>
           ) : !user.is_following ? (
