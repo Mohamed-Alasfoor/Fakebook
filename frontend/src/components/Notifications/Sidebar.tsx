@@ -70,8 +70,8 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
   };
 
   useEffect(() => {
-    const sessionID = Cookies.get("session_id");
-      if (!sessionID) {
+    const user_id = Cookies.get("user_id");
+    if (!user_id) {
       return;
     }
     fetchNotifications();
