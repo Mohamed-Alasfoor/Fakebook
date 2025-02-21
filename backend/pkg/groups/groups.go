@@ -498,8 +498,6 @@ func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
-
 // HandleInvitationHandler - Accept or Decline an invitation
 func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -577,8 +575,6 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
-// LeaveGroupHandler - Allows users to leave a group
 // LeaveGroupHandler - Allows users to leave a group
 func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -587,7 +583,6 @@ func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Get user ID from session
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -597,31 +592,35 @@ func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
 		var request struct {
 			GroupID string `json:"group_id"`
 		}
-
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		// Check if the user is the creator of the group
-		var creatorID string
-		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&creatorID)
+		// 1. Fetch the group's creator
+		var groupCreatorID string
+		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&groupCreatorID)
 		if err == sql.ErrNoRows {
 			http.Error(w, "Group not found", http.StatusNotFound)
 			return
 		} else if err != nil {
-			http.Error(w, "Database error", http.StatusInternalServerError)
+			http.Error(w, "Failed to retrieve group information", http.StatusInternalServerError)
 			return
 		}
 
-		// Prevent the group creator from leaving the group
-		if creatorID == userID {
-			http.Error(w, "Group creator cannot leave the group", http.StatusForbidden)
+		// 2. Compare with current user
+		if groupCreatorID == userID {
+			http.Error(w, "Creator cannot leave their own group. Please delete it instead.", http.StatusForbidden)
 			return
 		}
 
-		// Delete the user's membership if they are not the creator
-		_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member'`, request.GroupID, userID)
+		// 3. If not the creator, delete membership
+		_, err = db.Exec(`DELETE FROM group_membership 
+                          WHERE group_id = ? 
+                            AND user_id = ? 
+                            AND status = 'member'`,
+			request.GroupID, userID,
+		)
 		if err != nil {
 			http.Error(w, "Failed to leave group", http.StatusInternalServerError)
 			return
@@ -630,7 +629,6 @@ func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Left group successfully"))
 	}
 }
-
 
 // GetUserGroupsHandler - Fetches groups the user is a member of
 func GetUserGroupsHandler(db *sql.DB) http.HandlerFunc {
@@ -905,10 +903,8 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Content is required", http.StatusBadRequest)
 			return
 		}
-
-		//word count limit
 		if len(content) > 250 {
-			http.Error(w, "Content cannot exceed 250 words", http.StatusBadRequest)
+			http.Error(w, "Content cannot exceed 250 characters", http.StatusBadRequest)
 			return
 		}
 
@@ -961,7 +957,6 @@ func CreateGroupPostHandler(db *sql.DB) http.HandlerFunc {
 		})
 	}
 }
-
 
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
@@ -1137,8 +1132,8 @@ func CreateGroupPostCommentHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		//word count limit
-		if len(request.Content) > 250 {
-			http.Error(w, "Content cannot exceed 250 words", http.StatusBadRequest)
+		if len(request.Content) > 200 {
+			http.Error(w, "Content cannot exceed 200 words", http.StatusBadRequest)
 			return
 		}
 
