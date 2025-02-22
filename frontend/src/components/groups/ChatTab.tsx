@@ -12,6 +12,7 @@ interface ChatMessage {
   message: string;
   created_at: string;
   avatar?: string;
+  nickname?: string; // <-- new field
 }
 
 interface ChatTabProps {
@@ -35,10 +36,9 @@ export default function ChatTab({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Helper function to format date safely
+  // Helper to safely format time
   const formatTime = (dateString: string) => {
     const d = new Date(dateString);
-    // If the date is invalid, fallback to the current time.
     if (isNaN(d.getTime())) {
       return new Date().toLocaleTimeString([], {
         hour: "2-digit",
@@ -55,9 +55,9 @@ export default function ChatTab({
         Group Chat
       </div>
 
-      {/* Messages List - Flexible Height */}
+      {/* Messages List */}
       <ScrollArea className="flex-grow px-4 py-2 overflow-y-auto">
-        {messages === null || messages.length === 0 ? (
+        {!messages || messages.length === 0 ? (
           <p className="text-center text-gray-500 mt-4">No messages yet.</p>
         ) : (
           messages.map((msg, index) => {
@@ -69,6 +69,7 @@ export default function ChatTab({
                   isCurrentUser ? "justify-end" : "justify-start"
                 }`}
               >
+                {/* Only show avatar + nickname if not the current user */}
                 {!isCurrentUser && (
                   <Avatar className="w-6 h-6">
                     <AvatarImage
@@ -79,7 +80,7 @@ export default function ChatTab({
                       }
                     />
                     <AvatarFallback>
-                      {msg.sender_id.slice(0, 2).toUpperCase()}
+                      {msg.nickname ? msg.nickname.charAt(0) : "?"}
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -93,7 +94,7 @@ export default function ChatTab({
                 >
                   {!isCurrentUser && (
                     <p className="text-xs font-medium text-gray-600">
-                      {msg.sender_id}
+                      {msg.nickname || "Unknown"}
                     </p>
                   )}
                   <p>{msg.message}</p>
