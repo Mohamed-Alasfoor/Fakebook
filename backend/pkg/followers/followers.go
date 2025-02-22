@@ -305,15 +305,24 @@ func HandleFollowRequest(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Invalid action, must be 'accept' or 'decline'", http.StatusBadRequest)
 			return
 		}
-
+		var action string;
+		if request.Action == "accept" {
+			action = "accepted"
+		} else {
+			action = "declined"
+		}
 		// Ensure the logged-in user is the one being followed (FollowedID)
 		result, err := db.Exec(`UPDATE followers SET status = ? WHERE follower_id = ? AND followed_id = ? AND status = 'pending'`,
-			request.Action, request.FollowerID, userID)
+			action, request.FollowerID, userID)
 		if err != nil {
 			http.Error(w, "Failed to update follow request", http.StatusInternalServerError)
 			return
 		}
-
+		result,err = db.Exec("DELETE FROM notifications WHERE user_id = ? AND related_user_id = ? AND type = 'follow_request'", userID, request.FollowerID)
+		if err != nil {
+			http.Error(w, "Failed to delete notification", http.StatusInternalServerError)
+			return
+		}
 		rowsAffected, _ := result.RowsAffected()
 		if rowsAffected == 0 {
 			http.Error(w, "No pending follow request found", http.StatusNotFound)
@@ -322,8 +331,7 @@ func HandleFollowRequest(db *sql.DB) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(fmt.Sprintf("Follow request %s", request.Action)))
-	}
-}
+	}}
 
 // GetFollowRequestsHandler fetches pending follow requests for a user
 func GetFollowRequestsHandler(db *sql.DB) http.HandlerFunc {
