@@ -91,6 +91,7 @@ type ChatMessage struct {
 	// Type can be "message" for regular messages or "typing" for typing notifications.
 	Type      string `json:"type"`
 	CreatedAt string `json:"created_at"`
+    SenderName string `json:"sender_name"`
 }
 
 // -----------------------------
@@ -187,6 +188,10 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
             msg.SenderID = userID
             msg.ID = uuid.New().String()
             msg.CreatedAt = time.Now().Format(time.RFC3339)
+            err = db.QueryRow("SELECT nickname FROM users WHERE id = ?", msg.SenderID).Scan(&msg.SenderName)
+            if err != nil {
+                msg.SenderName = userID
+            }
 
             // Handle typing notifications
             if msg.Type == "typing" {
