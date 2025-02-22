@@ -56,6 +56,7 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
         // Retrieve form fields
         content := r.Form.Get("content")
         privacy := r.Form.Get("privacy")
+
         if strings.TrimSpace(content) == "" {
             http.Error(w, "Content cannot be empty", http.StatusBadRequest)
             return
@@ -117,10 +118,10 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
         // Generate a UUID for the post
         postID := uuid.New().String()
 
-        // Insert post into the database
+        // Insert post into the database (with created_at timestamp)
         query := `
-            INSERT INTO posts (id, user_id, content, image_url, privacy)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO posts (id, user_id, content, image_url, privacy, created_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         `
         _, err = db.Exec(query, postID, userID, content, imageURL, privacy)
         if err != nil {
@@ -128,9 +129,16 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
             return
         }
 
+        // Retrieve the created_at timestamp for the response
+        var createdAt string
+        err = db.QueryRow(`SELECT created_at FROM posts WHERE id = ?`, postID).Scan(&createdAt)
+        if err != nil {
+            http.Error(w, "Failed to fetch post timestamp", http.StatusInternalServerError)
+            return
+        }
+
         // If privacy is private, handle allowed users
         if privacy == "private" {
-            // Retrieve allowed users from the form (should be sent as allowed_users[])
             allowedUsers := r.Form["allowed_users[]"]
             for _, allowedUserID := range allowedUsers {
                 _, err := db.Exec("INSERT INTO post_privacy (post_id, user_id) VALUES (?, ?)", postID, allowedUserID)
@@ -143,11 +151,12 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 
         // Build the response
         response := map[string]interface{}{
-            "message":   "Post created successfully",
-            "post_id":   postID,
-            "content":   content,
-            "privacy":   privacy,
-            "image_url": imageURL,
+            "message":    "Post created successfully",
+            "post_id":    postID,
+            "content":    content,
+            "privacy":    privacy,
+            "image_url":  imageURL,
+            "created_at": createdAt, // Include created_at to prevent frontend errors
         }
 
         w.Header().Set("Content-Type", "application/json")
@@ -155,6 +164,7 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
         json.NewEncoder(w).Encode(response)
     }
 }
+
 
 
 

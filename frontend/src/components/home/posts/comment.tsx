@@ -1,4 +1,5 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { formatPostDate } from "@/lib/utils";
 
 interface CommentItemProps {
   comment: Comment;
@@ -37,7 +38,9 @@ export function CommentItem({ comment }: CommentItemProps) {
         <div className="flex justify-between items-center mb-1">
           <h4 className="font-semibold text-gray-900">{comment.nickname}</h4>
           <p className="text-xs text-gray-500">
-            {new Date(comment.created_at).toLocaleString()}
+            {comment.created_at
+              ? formatPostDate(comment.created_at)
+              : "Just now"}
           </p>
         </div>
         <p className="text-gray-800 text-sm leading-relaxed break-words whitespace-pre-wrap">

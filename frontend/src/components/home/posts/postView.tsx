@@ -3,6 +3,7 @@ import axios from "axios";
 import { Post } from "@/types/post";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { formatPostDate } from "@/lib/utils";
 import {
   Heart,
   MessageCircle,
@@ -169,7 +170,7 @@ export function PostView({
         <div>
           <h3 className="font-semibold">{post.nickname}</h3>
           <p className="text-sm text-gray-500">
-            {new Date(post.created_at).toLocaleString()}
+            {post.created_at ? formatPostDate(post.created_at) : "Just now"}
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { Heart, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { formatPostDate } from "@/lib/utils";
 
 interface PostItemProps {
   post: any;
@@ -41,7 +42,9 @@ export default function PostItem({
               {post.nickname}
             </h3>
           </Link>
-          <p className="text-sm text-gray-500">{post.created_at}</p>
+          <p className="text-sm text-gray-500">
+            {post.created_at ? formatPostDate(post.created_at) : "Just now"}
+          </p>
         </div>
       </div>
 
