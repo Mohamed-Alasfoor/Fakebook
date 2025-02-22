@@ -55,7 +55,7 @@ export function MessageList({ currentUserId, userId }: MessageListProps) {
       ) : (
         mergedMessages.map((message,i) => (
           <div
-            key={message.id||i}
+            key={i}
             className={`flex mb-4 ${
               message.sender_id === currentUserId ? "justify-end" : "justify-start"
             }`}

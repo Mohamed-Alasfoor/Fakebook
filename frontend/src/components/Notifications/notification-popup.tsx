@@ -48,7 +48,7 @@ export default function NotificationPopup({ message, username, onClose }: Notifi
               </button>
             </div>
             <p className="text-sm text-white/90 mt-1">{username} sent you a message</p>
-            <p className="text-sm font-medium mt-2 bg-white/10 p-2 rounded">"{message}"</p>
+            <p className="text-sm font-medium mt-2 bg-white/10 p-2 rounded">{message}</p>
           </motion.div>
         )}
       </AnimatePresence>

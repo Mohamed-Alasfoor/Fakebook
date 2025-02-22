@@ -1,4 +1,3 @@
-// app/group/[id]/page.tsx (or wherever your GroupView component is located)
 "use client";
 
 import { useEffect, useRef, useState } from "react";

@@ -16,6 +16,7 @@ export interface ChatMessage {
   message: string;
   type: string;
   created_at: string;
+  sender_name : string;
 }
 
 interface ChatSocketContextValue {
@@ -105,7 +106,7 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
       {latestMessage && (
         <NotificationPopup
           message={latestMessage.message}
-          username={`User ${latestMessage.sender_id}`}
+          username={`${latestMessage.sender_name}`}
           onClose={() => setLatestMessage(null)}
         />
       )}
