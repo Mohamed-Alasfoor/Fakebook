@@ -1,7 +1,3 @@
-"use client";
-
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,16 +9,6 @@ interface ProfileHeaderProps {
 }
 
 export default function ProfileHeader({ user }: ProfileHeaderProps) {
-  const router = useRouter();
-
-  // 1) Local state to track user data
-  const [localUser, setLocalUser] = useState(user);
-
-  // If the parent passes a new user, sync local state
-  useEffect(() => {
-    setLocalUser(user);
-  }, [user]);
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -32,7 +18,6 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
     });
   };
 
-  // 2) Follow logic
   const followUser = async (followedId: string) => {
     try {
       const response = await axios.post(
@@ -40,38 +25,27 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
         { followed_id: followedId },
         {
           withCredentials: true,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
       );
       alert("Follow Response: " + response.data);
-
-      // Update local state so the button changes to "Unfollow"
-      setLocalUser((prev: any) => ({
-        ...prev,
-        is_following: true,
-        followers_count: prev.followers_count + 1,
-      }));
     } catch (error) {
       alert("Error following user");
     }
   };
 
-  // 3) Unfollow logic
   const unfollowUser = async (followedId: string) => {
     try {
       const response = await axios.delete("http://localhost:8080/unfollow", {
         data: { followed_id: followedId },
         withCredentials: true,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
       alert(response.data);
-
-      // Update local state so the button changes to "Follow"
-      setLocalUser((prev: any) => ({
-        ...prev,
-        is_following: false,
-        followers_count: prev.followers_count - 1,
-      }));
     } catch (error) {
       alert("Error unfollowing user");
     }
@@ -84,40 +58,38 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
           <Avatar className="w-32 h-32">
             <AvatarImage
               src={
-                localUser.avatar
-                  ? `http://localhost:8080/avatars/${localUser.avatar}`
+                user.avatar
+                  ? `http://localhost:8080/avatars/${user.avatar}`
                   : "/profile.png"
               }
-              alt={`${localUser.first_name} ${localUser.last_name}`}
+              alt={`${user.first_name} ${user.last_name}`}
             />
             <AvatarFallback>
-              {localUser.first_name[0]}
-              {localUser.last_name[0]}
+              {user.first_name[0]}
+              {user.last_name[0]}
             </AvatarFallback>
           </Avatar>
-
           <div className="flex-1">
             <h1 className="text-3xl font-bold mb-2">
-              {localUser.first_name} {localUser.last_name}
+              {user.first_name} {user.last_name}
             </h1>
             <p className="text-xl text-muted-foreground mb-4">
-              @{localUser.nickname}
+              @{user.nickname}
             </p>
-            <p className="text-lg mb-4">{localUser.about_me}</p>
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
                 <CalendarIcon className="w-4 h-4" />
-                <span>Joined {formatDate(localUser.date_of_birth)}</span>
+                <span>Joined {formatDate(user.date_of_birth)}</span>
               </div>
               <div className="flex items-center gap-1">
                 <UserIcon className="w-4 h-4" />
-                <span>{localUser.followers_count} Followers</span>
+                <span>{user.followers_count} Followers</span>
               </div>
               <div className="flex items-center gap-1">
                 <UsersIcon className="w-4 h-4" />
-                <span>{localUser.following_count} Following</span>
+                <span>{user.following_count} Following</span>
               </div>
-              {localUser.private && (
+              {user.private && (
                 <div className="flex items-center gap-1">
                   <LockIcon className="w-4 h-4" />
                   <span>Private Account</span>
@@ -125,27 +97,21 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
               )}
             </div>
           </div>
-
-          {/* Button Logic */}
-          {localUser.is_my_profile ? (
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => router.push("/settings")}
-            >
+          {user.is_my_profile ? (
+            <Button variant="outline" className="mt-4">
               Edit Profile
             </Button>
-          ) : !localUser.is_following ? (
+          ) : !user.is_following ? (
             <Button
               className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white"
-              onClick={() => followUser(localUser.id)}
+              onClick={() => followUser(user.id)}
             >
-              {localUser.private ? "Request to Follow" : "Follow"}
+              {user.private ? "Request to Follow" : "Follow"}
             </Button>
           ) : (
             <Button
               className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white"
-              onClick={() => unfollowUser(localUser.id)}
+              onClick={() => unfollowUser(user.id)}
             >
               Unfollow
             </Button>
@@ -155,3 +121,4 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
     </Card>
   );
 }
+

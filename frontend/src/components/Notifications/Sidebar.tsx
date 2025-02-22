@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Bell, X } from "lucide-react";
+import { Bell, X, UserCheck, UserX } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import Cookies from "js-cookie";
 
@@ -51,11 +51,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
         credentials: "include",
       });
       if (!res.ok) {
-        console.error(
-          "Failed to fetch notifications, status:",
-          res.status,
-          await res.text()
-        );
+        console.error("Failed to fetch notifications, status:", res.status);
         setNotifications([]);
         return;
       }
@@ -70,87 +66,50 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
   };
 
   useEffect(() => {
-    const user_id = Cookies.get("user_id");
-    if (!user_id) {
-      return;
-    }
+    if (!currentUserId) return;
     fetchNotifications();
   }, []);
 
+  // Handle marking a notification as read
   const markNotificationAsRead = async (notificationId: string) => {
     try {
-      const res = await fetch(
-        `http://localhost:8080/notifications/read?id=${notificationId}`,
-        {
-          method: "PUT",
-          credentials: "include",
-        }
-      );
+      const res = await fetch(`http://localhost:8080/notifications/read?id=${notificationId}`, {
+        method: "PUT",
+        credentials: "include",
+      });
       if (res.ok) {
         setNotifications((prev) =>
           prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
         );
-      } else {
-        console.error("Failed to mark notification as read", res.status);
       }
     } catch (error) {
       console.error("Error marking notification as read", error);
     }
   };
 
-  const handleJoinRequestAction = async (
-    notification: Notification,
-    action: "accept" | "decline"
-  ) => {
+  // Handle accepting or declining a follow request
+  const handleFollowRequest = async (notification: Notification, action: "accept" | "decline") => {
     try {
-      const res = await fetch("http://localhost:8080/groups/join/respond", {
+      const res = await fetch("http://localhost:8080/follow/request", {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          group_id: notification.group_id,
-          user_id: notification.related_user_id,
+          follower_id: notification.related_user_id,
           action: action,
         }),
       });
       if (res.ok) {
-        setNotifications((prev) =>
-          prev.filter((n) => n.id !== notification.id)
-        );
+        setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
       } else {
-        console.error("Failed to handle join request", res.status);
+        console.error("Failed to handle follow request", res.status);
       }
     } catch (error) {
-      console.error("Error handling join request", error);
+      console.error("Error handling follow request", error);
     }
   };
 
-  const handleInvitationAction = async (
-    notification: Notification,
-    action: "accept" | "decline"
-  ) => {
-    try {
-      const res = await fetch("http://localhost:8080/groups/invite/respond", {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          group_id: notification.group_id,
-          action: action,
-        }),
-      });
-      if (res.ok) {
-        setNotifications((prev) =>
-          prev.filter((n) => n.id !== notification.id)
-        );
-      } else {
-        console.error("Failed to handle invitation", res.status);
-      }
-    } catch (error) {
-      console.error("Error handling invitation", error);
-    }
-  };
-
+  // Handle marking all notifications as read
   const markAllAsRead = async () => {
     try {
       const res = await fetch("http://localhost:8080/notifications/read-all", {
@@ -159,8 +118,6 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
       });
       if (res.ok) {
         setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-      } else {
-        console.error("Failed to mark all as read", res.status);
       }
     } catch (error) {
       console.error("Error marking all as read", error);
@@ -184,12 +141,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           <Bell className="w-7 h-7" />
           <span className="text-2xl font-semibold">Notifications</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="xl:hidden text-white"
-          onClick={onClose}
-        >
+        <Button variant="ghost" size="icon" className="xl:hidden text-white" onClick={onClose}>
           <X className="w-7 h-7" />
         </Button>
       </div>
@@ -205,85 +157,45 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
             {notifications.map((notification) => (
               <li
                 key={notification.id}
-                onClick={() => {
-                  // If not a join request or invite, simply mark as read on click.
-                  if (
-                    notification.type !== "group_join_request" &&
-                    notification.type !== "group_invite"
-                  ) {
-                    markNotificationAsRead(notification.id);
-                  }
-                }}
                 className={`
                   flex flex-col p-4 rounded-xl shadow-md transition transform hover:scale-105 cursor-pointer
                   ${notification.read ? "bg-white/10" : "bg-white/20"}
                 `}
               >
                 <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <Avatar className="w-10 h-10">
-                      <AvatarImage
-                        src="/profile.png"
-                        alt="Notification Avatar"
-                      />
-                      <AvatarFallback>
-                        {notification.content.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    {!notification.read && (
-                      <span className="absolute top-0 right-0 block h-3 w-3 rounded-full bg-red-500 border-2 border-white"></span>
-                    )}
-                  </div>
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src="/profile.png" alt="Notification Avatar" />
+                    <AvatarFallback>{notification.content.charAt(0)}</AvatarFallback>
+                  </Avatar>
                   <div className="flex-1">
-                    <p
-                      className={`text-sm ${
-                        notification.read ? "opacity-80" : "font-semibold"
-                      }`}
-                    >
+                    <p className={`text-sm ${notification.read ? "opacity-80" : "font-semibold"}`}>
                       {notification.content}
                     </p>
-                    <span className="text-xs text-gray-200">
-                      {formatTime(notification.created_at)}
-                    </span>
+                    <span className="text-xs text-gray-200">{formatTime(notification.created_at)}</span>
                   </div>
                 </div>
 
-                {/* If the notification is a join request or an invitation, show action buttons */}
-                {(notification.type === "group_join_request" ||
-                  notification.type === "group_invite") &&
-                  !notification.content.toLowerCase().includes("has been") &&
-                  currentUserId === notification.user_id && (
-                    <div className="flex gap-2 mt-2">
-                      <Button
-                        variant="outline"
-                        className="w-full border-green-400 text-green-400 hover:bg-green-500 hover:text-white"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (notification.type === "group_join_request") {
-                            handleJoinRequestAction(notification, "accept");
-                          } else {
-                            handleInvitationAction(notification, "accept");
-                          }
-                        }}
-                      >
-                        Accept
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full border-red-400 text-red-400 hover:bg-red-500 hover:text-white"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (notification.type === "group_join_request") {
-                            handleJoinRequestAction(notification, "decline");
-                          } else {
-                            handleInvitationAction(notification, "decline");
-                          }
-                        }}
-                      >
-                        Reject
-                      </Button>
-                    </div>
-                  )}
+                {/* Follow Request Actions */}
+                {notification.type === "follow_request" && (
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      className="w-full border-green-400 text-green-400 hover:bg-green-500 hover:text-white flex items-center gap-1"
+                      variant="outline"
+                      onClick={() => handleFollowRequest(notification, "accept")}
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      Accept
+                    </Button>
+                    <Button
+                      className="w-full border-red-400 text-red-400 hover:bg-red-500 hover:text-white flex items-center gap-1"
+                      variant="outline"
+                      onClick={() => handleFollowRequest(notification, "decline")}
+                    >
+                      <UserX className="w-4 h-4" />
+                      Decline
+                    </Button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -292,14 +204,11 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
 
       {/* Footer */}
       <div className="mt-6 pt-4 border-t border-white/20">
-        <Button
-          variant="outline"
-          className="w-full border-white/30 text-white bg-teal-500 hover:bg-teal-600"
-          onClick={markAllAsRead}
-        >
+        <Button variant="outline" className="w-full border-white/30 text-white bg-teal-500 hover:bg-teal-600" onClick={markAllAsRead}>
           Mark all as read
         </Button>
       </div>
     </div>
   );
 }
+
