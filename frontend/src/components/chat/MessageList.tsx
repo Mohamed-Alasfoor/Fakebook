@@ -50,12 +50,12 @@ export function MessageList({ currentUserId, userId }: MessageListProps) {
 
   return (
     <ScrollArea className="flex-grow p-6">
-      {mergedMessages.length === 0 ? (
+      {mergedMessages.length === 0 || mergedMessages===null ? (
         <p className="text-center text-gray-400">No messages yet. Start the conversation!</p>
       ) : (
-        mergedMessages.map((message) => (
+        mergedMessages.map((message,i) => (
           <div
-            key={message.id}
+            key={message.id||i}
             className={`flex mb-4 ${
               message.sender_id === currentUserId ? "justify-end" : "justify-start"
             }`}

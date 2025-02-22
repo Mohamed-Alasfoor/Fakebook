@@ -1,5 +1,6 @@
 "use client";
 
+import NotificationPopup from "@/components/Notifications/notification-popup";
 import React, {
   createContext,
   useContext,
@@ -30,11 +31,10 @@ const ChatSocketContext = createContext<ChatSocketContextValue | undefined>(
 export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  // Ensure the initial state is an empty array
   const [ws, setWs] = useState<WebSocket | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>(() => []);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [latestMessage, setLatestMessage] = useState<ChatMessage | null>(null);
 
-  // Use a ref to ensure we only connect once
   const connectedRef = useRef(false);
 
   useEffect(() => {
@@ -54,15 +54,11 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
 
       socket.onmessage = (event) => {
         console.log("📩 Private chat message received:", event.data);
+
         try {
           const data: ChatMessage = JSON.parse(event.data);
-          setMessages((prev) => {
-            if (prev == null) {
-              console.warn("prevMessages was null; defaulting to empty array");
-              return [data];
-            }
-            return [...prev, data];
-          });
+          setMessages((prev) => [...prev, data]);
+          setLatestMessage(data); // Set latest message to trigger notification
         } catch (e) {
           console.error("Error parsing private chat message", e);
         }
@@ -93,19 +89,11 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
     if (ws && ws.readyState === WebSocket.OPEN) {
       const message = {
         ...msg,
-        id: Date.now().toString(), // Temporary ID; backend may override it
+        id: Date.now().toString(),
         created_at: new Date().toISOString(),
       };
       ws.send(JSON.stringify(message));
-      setMessages((prev) => {
-        if (prev == null) {
-          console.warn(
-            "prevMessages was null in sendMessage; defaulting to empty array"
-          );
-          return [message];
-        }
-        return [...prev, message];
-      });
+      setMessages((prev) => [...prev, message]);
     } else {
       console.error("WebSocket is not connected.");
     }
@@ -114,6 +102,13 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   return (
     <ChatSocketContext.Provider value={{ ws, sendMessage, messages }}>
       {children}
+      {latestMessage && (
+        <NotificationPopup
+          message={latestMessage.message}
+          username={`User ${latestMessage.sender_id}`}
+          onClose={() => setLatestMessage(null)}
+        />
+      )}
     </ChatSocketContext.Provider>
   );
 };
