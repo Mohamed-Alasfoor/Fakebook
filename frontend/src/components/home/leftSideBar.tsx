@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Home, Users, Settings, MessageCircle, LogOut, X } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -77,14 +76,6 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="mb-4">
-        <Input
-          placeholder="Search"
-          className="bg-white/20 border-0 placeholder:text-white/70 text-white"
-        />
-      </div>
-
       {/* Navigation */}
       <nav>
         <ul className="space-y-2">
@@ -107,7 +98,9 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
         {isLoading ? (
           <p className="text-center text-sm">Loading profile...</p>
         ) : isError || !user ? (
-          <p className="text-center text-red-500 text-sm">Error loading profile</p>
+          <p className="text-center text-red-500 text-sm">
+            Error loading profile
+          </p>
         ) : (
           <div
             className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-white/10 rounded-lg"
