@@ -32,7 +32,6 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 		var request struct {
 			FollowedID string `json:"followed_id"`
 		}
-
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			log.Printf("Error decoding request body: %v", err)
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -40,7 +39,6 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 		}
 		log.Printf("Decoded request: UserID=%s, FollowedID=%s", userID, request.FollowedID)
 
-		// Validate fields
 		if request.FollowedID == "" {
 			http.Error(w, "Missing followed_id", http.StatusBadRequest)
 			return
@@ -61,7 +59,9 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 		// Check if follow relationship already exists
 		var existingStatus string
 		err = db.QueryRow(`
-			SELECT status FROM followers WHERE follower_id = ? AND followed_id = ?
+			SELECT status 
+			FROM followers 
+			WHERE follower_id = ? AND followed_id = ?
 		`, userID, request.FollowedID).Scan(&existingStatus)
 
 		if err == nil {
@@ -78,6 +78,15 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Retrieve the nickname of the follower (the current user)
+		var followerNickname string
+		err = db.QueryRow(`SELECT nickname FROM users WHERE id = ?`, userID).Scan(&followerNickname)
+		if err != nil {
+			log.Printf("Error fetching follower nickname: %v", err)
+			http.Error(w, "Error fetching user nickname", http.StatusInternalServerError)
+			return
+		}
+
 		// Check privacy of the followed user
 		var isPrivate bool
 		err = db.QueryRow(`SELECT private FROM users WHERE id = ?`, request.FollowedID).Scan(&isPrivate)
@@ -87,7 +96,7 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Handle private vs. public profile
+		// Handle private vs public profile
 		if isPrivate {
 			log.Printf("User %s has a private profile. Creating follow request...", request.FollowedID)
 			_, err := db.Exec(`
@@ -103,12 +112,12 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 			// Send notification to the private user
 			err = notifications.CreateNotification(
 				db,
-				request.FollowedID,            // The user receiving the request
-				"follow_request",              // Notification type
-				fmt.Sprintf("User %s has requested to follow you.", userID), 
-				"",                            // postID
-				userID,                        // relatedUserID (the follower)
-				"",                            // groupID
+				request.FollowedID,               // The user receiving the request
+				"follow_request",                 // Notification type
+				fmt.Sprintf("%s has requested to follow you.", followerNickname), // Use nickname here
+				"",                               // postID
+				userID,                           // relatedUserID (the follower)
+				"",                               // groupID
 				"",
 			)
 			if err != nil {
@@ -128,12 +137,12 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 				return
 			}
 
-			// **Also create a notification** for the followed user:
+			// Also create a notification for the followed user:
 			err = notifications.CreateNotification(
 				db,
-				request.FollowedID, // The user that is being followed
+				request.FollowedID, // The user being followed
 				"follow",           // A custom type, e.g. "follow"
-				fmt.Sprintf("User %s is now following you.", userID), 
+				fmt.Sprintf("%s is now following you.", followerNickname), // Use nickname
 				"",                 // postID
 				userID,             // relatedUserID (the follower)
 				"",                 // groupID
@@ -141,13 +150,13 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 			)
 			if err != nil {
 				log.Println("Failed to create notification:", err)
-				// Not failing the entire request, just log it
 			}
 
 			w.Write([]byte("Followed successfully"))
 		}
 	}
 }
+
 
 
 // UnfollowHandler handles requests to unfollow a user
