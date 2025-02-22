@@ -30,17 +30,15 @@ const ChatSocketContext = createContext<ChatSocketContextValue | undefined>(
 export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  // Ensure the initial state is an empty array
   const [ws, setWs] = useState<WebSocket | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => []);
 
   // Use a ref to ensure we only connect once
   const connectedRef = useRef(false);
 
   useEffect(() => {
-    // If we've already connected once, do nothing
-    if (connectedRef.current) {
-      return;
-    }
+    if (connectedRef.current) return;
     connectedRef.current = true;
 
     let socket: WebSocket;
@@ -58,7 +56,13 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log("📩 Private chat message received:", event.data);
         try {
           const data: ChatMessage = JSON.parse(event.data);
-          setMessages((prev) => [...prev, data]);
+          setMessages((prev) => {
+            if (prev == null) {
+              console.warn("prevMessages was null; defaulting to empty array");
+              return [data];
+            }
+            return [...prev, data];
+          });
         } catch (e) {
           console.error("Error parsing private chat message", e);
         }
@@ -93,8 +97,15 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
         created_at: new Date().toISOString(),
       };
       ws.send(JSON.stringify(message));
-      // Immediately add to local state
-      setMessages((prev) => [...prev, message]);
+      setMessages((prev) => {
+        if (prev == null) {
+          console.warn(
+            "prevMessages was null in sendMessage; defaulting to empty array"
+          );
+          return [message];
+        }
+        return [...prev, message];
+      });
     } else {
       console.error("WebSocket is not connected.");
     }

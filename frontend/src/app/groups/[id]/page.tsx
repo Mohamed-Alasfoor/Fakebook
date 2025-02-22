@@ -284,7 +284,7 @@ export default function GroupView() {
     if (socket) {
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
-        setMessages((prevMessages) => [...prevMessages, message]);
+        setMessages((prevMessages) => [...(prevMessages ?? []), message]);
       };
     }
   }, [socket]);
