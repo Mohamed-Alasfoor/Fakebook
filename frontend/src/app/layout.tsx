@@ -82,7 +82,7 @@ export default function RootLayout({
                   {/* RIGHT SIDEBAR ICON */}
                   <button
                     onClick={() => setRightOpen(!rightOpen)}
-                    className="w-10 h-10 flex items-center justify-center bg-indigo-600 text-white rounded-md"
+                    className="w-10 h-10 flex items-center justify-center bg-purple-600 text-white rounded-md"
                   >
                     <Bell className="w-6 h-6" />
                   </button>
