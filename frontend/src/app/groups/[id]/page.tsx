@@ -299,7 +299,16 @@ export default function GroupView() {
   // --- Send Message Handler ---
   const handleSendMessage = () => {
     if (newMessage.trim() && isConnected) {
-      sendMessage(JSON.stringify({ message: newMessage }));
+      const now = new Date();
+      const message = {
+        message: newMessage,
+        // Use now.getTime() for a numeric id (converted to string)
+        id: now.getTime().toString(),
+        // Generate a valid ISO timestamp
+        created_at: now.toISOString(),
+      };
+      // Pass the JSON string to sendMessage (since your useWebSocket hook expects a string)
+      sendMessage(JSON.stringify(message));
       setNewMessage("");
     }
   };

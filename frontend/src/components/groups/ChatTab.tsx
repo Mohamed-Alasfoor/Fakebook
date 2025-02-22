@@ -35,6 +35,19 @@ export default function ChatTab({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Helper function to format date safely
+  const formatTime = (dateString: string) => {
+    const d = new Date(dateString);
+    // If the date is invalid, fallback to the current time.
+    if (isNaN(d.getTime())) {
+      return new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
   return (
     <div className="flex flex-col flex-grow min-h-[400px] max-h-[75vh] border rounded-lg shadow-md bg-white">
       {/* Chat Header */}
@@ -44,7 +57,7 @@ export default function ChatTab({
 
       {/* Messages List - Flexible Height */}
       <ScrollArea className="flex-grow px-4 py-2 overflow-y-auto">
-        {messages === null ? (
+        {messages === null || messages.length === 0 ? (
           <p className="text-center text-gray-500 mt-4">No messages yet.</p>
         ) : (
           messages.map((msg, index) => {
@@ -60,13 +73,11 @@ export default function ChatTab({
                   <Avatar className="w-6 h-6">
                     <AvatarImage
                       src={
-                        // If the message object includes an avatar field, use it (prefixed with your URL); otherwise, use the dicebear fallback.
                         msg.avatar
                           ? `http://localhost:8080/avatars/${msg.avatar}`
                           : `https://api.dicebear.com/6.x/initials/svg?seed=${msg.sender_id}`
                       }
                     />
-
                     <AvatarFallback>
                       {msg.sender_id.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
@@ -87,10 +98,7 @@ export default function ChatTab({
                   )}
                   <p>{msg.message}</p>
                   <p className="text-xs text-right opacity-60">
-                    {new Date(msg.created_at).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatTime(msg.created_at)}
                   </p>
                 </div>
               </div>
