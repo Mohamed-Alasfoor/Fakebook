@@ -6,22 +6,26 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/uuid"
 	"social-network/pkg/sessions"
+
+	"github.com/google/uuid"
 )
 
 type Notification struct {
-	ID            string `json:"id"`
-	UserID        string `json:"user_id"`
-	Type          string `json:"type"`
-	Content       string `json:"content"`
-	PostID        string `json:"post_id,omitempty"`
-	RelatedUserID string `json:"related_user_id,omitempty"`
-	GroupID       string `json:"group_id,omitempty"`
-	EventID       string `json:"event_id,omitempty"`
-	Read          bool   `json:"read"`
-	CreatedAt     string `json:"created_at"`
+	ID             string `json:"id"`
+	UserID         string `json:"user_id"`
+	Type           string `json:"type"`
+	Content        string `json:"content"`
+	PostID         string `json:"post_id,omitempty"`
+	RelatedUserID  string `json:"related_user_id,omitempty"`
+	GroupID        string `json:"group_id,omitempty"`
+	EventID        string `json:"event_id,omitempty"`
+	Read           bool   `json:"read"`
+	CreatedAt      string `json:"created_at"`
+	SenderNickname string `json:"sender_nickname,omitempty"`
+	SenderAvatar   string `json:"sender_avatar,omitempty"`
 }
+
 
 // AddNotificationHandler adds a new notification
 func AddNotificationHandler(db *sql.DB) http.HandlerFunc {
@@ -61,11 +65,14 @@ func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
+
 		rows, err := db.Query(`
-			SELECT id, user_id, type, content, post_id, related_user_id, group_id, event_id, read, created_at
-			FROM notifications
-			WHERE user_id = ?
-			ORDER BY created_at DESC
+			SELECT n.id, n.user_id, n.type, n.content, n.post_id, n.related_user_id, n.group_id, n.event_id, n.read, n.created_at,
+			       u.nickname, u.avatar
+			FROM notifications n
+			LEFT JOIN users u ON n.related_user_id = u.id
+			WHERE n.user_id = ?
+			ORDER BY n.created_at DESC
 		`, userID)
 		if err != nil {
 			http.Error(w, "Failed to fetch notifications", http.StatusInternalServerError)
@@ -75,7 +82,20 @@ func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 		var notifications []Notification
 		for rows.Next() {
 			var notification Notification
-			if err := rows.Scan(&notification.ID, &notification.UserID, &notification.Type, &notification.Content, &notification.PostID, &notification.RelatedUserID, &notification.GroupID, &notification.EventID, &notification.Read, &notification.CreatedAt); err != nil {
+			if err := rows.Scan(
+				&notification.ID,
+				&notification.UserID,
+				&notification.Type,
+				&notification.Content,
+				&notification.PostID,
+				&notification.RelatedUserID,
+				&notification.GroupID,
+				&notification.EventID,
+				&notification.Read,
+				&notification.CreatedAt,
+				&notification.SenderNickname,
+				&notification.SenderAvatar,
+			); err != nil {
 				http.Error(w, "Failed to parse notifications", http.StatusInternalServerError)
 				return
 			}
@@ -85,6 +105,7 @@ func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(notifications)
 	}
 }
+
 
 // MarkNotificationReadHandler marks a single notification as read.
 func MarkNotificationReadHandler(db *sql.DB) http.HandlerFunc {
