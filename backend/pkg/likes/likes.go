@@ -2,6 +2,7 @@ package likes
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"social-network/pkg/notifications"
 	"social-network/pkg/sessions"
@@ -74,7 +75,16 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 
 		// Only create a notification if the liker is not the post owner.
 		if userID != postOwnerID {
-			err = notifications.CreateNotification(db, postOwnerID, "like", "Your post was liked", postID, userID, "", "")
+			// Retrieve the nickname of the liker.
+			var likerNickname string
+			err = db.QueryRow(`SELECT nickname FROM users WHERE id = ?`, userID).Scan(&likerNickname)
+			if err != nil {
+				http.Error(w, "Failed to retrieve liker nickname", http.StatusInternalServerError)
+				return
+			}
+
+			notificationMsg := fmt.Sprintf("%s has liked your post.", likerNickname)
+			err = notifications.CreateNotification(db, postOwnerID, "like", notificationMsg, postID, userID, "", "")
 			if err != nil {
 				http.Error(w, "Failed to create notification", http.StatusInternalServerError)
 				return
@@ -86,7 +96,6 @@ func AddLikeHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
 // RemoveLikeHandler allows a user to unlike a post
 func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -95,24 +104,24 @@ func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Retrieve the session_id from the session cookie
+		// Retrieve the session_id from the session cookie.
 		_, err := sessions.GetSessionValue(r, sessions.SessionCookieName)
 		if err != nil {
 			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
 
-		// Query the database to retrieve the user_id associated with the session_id
-		userID,_ := sessions.GetUserIDFromSession(r) 
+		// Query the database to retrieve the user_id associated with the session.
+		userID, _ := sessions.GetUserIDFromSession(r)
 
-		// Extract post_id from query params
+		// Extract post_id from query params.
 		postID := r.URL.Query().Get("post_id")
 		if postID == "" {
 			http.Error(w, "Missing post_id", http.StatusBadRequest)
 			return
 		}
 
-		// Check if the user has already liked the post
+		// Check if the user has already liked the post.
 		var exists bool
 		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM likes WHERE post_id = ? AND user_id = ?)`, postID, userID).Scan(&exists)
 		if err != nil {
@@ -125,7 +134,7 @@ func RemoveLikeHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Remove the like from the database
+		// Remove the like from the database.
 		query := `
 			DELETE FROM likes
 			WHERE post_id = ? AND user_id = ?
