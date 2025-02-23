@@ -318,7 +318,7 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Get the creator's (logged-in user's) ID from the session.
+		// Get the group creator’s (logged-in user's) ID from the session.
 		creatorID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -326,19 +326,19 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Parse the request body.
-		var request struct {
+		var req struct {
 			GroupID string `json:"group_id"`
 			UserID  string `json:"user_id"` // The requester's ID.
 			Action  string `json:"action"`  // "accept" or "decline"
 		}
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
 		// Ensure that only the group creator can handle join requests.
 		var ownerID, groupName string
-		err = db.QueryRow(`SELECT creator_id, name FROM groups WHERE id = ?`, request.GroupID).Scan(&ownerID, &groupName)
+		err = db.QueryRow(`SELECT creator_id, name FROM groups WHERE id = ?`, req.GroupID).Scan(&ownerID, &groupName)
 		if err == sql.ErrNoRows {
 			http.Error(w, "Group not found", http.StatusNotFound)
 			return
@@ -352,49 +352,61 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Retrieve the creator’s (responder’s) nickname.
+		var creatorNickname string
+		err = db.QueryRow(`SELECT nickname FROM users WHERE id = ?`, ownerID).Scan(&creatorNickname)
+		if err != nil {
+			http.Error(w, "Failed to retrieve your nickname", http.StatusInternalServerError)
+			return
+		}
+
 		// Process the join request.
 		var notificationMsg string
-		if request.Action == "accept" {
+		if req.Action == "accept" {
 			// Update the membership status to 'member'.
-			_, err = db.Exec(`UPDATE group_membership SET status = 'member' WHERE group_id = ? AND user_id = ? AND status = 'pending_request'`, request.GroupID, request.UserID)
-			notificationMsg = fmt.Sprintf("Your request to join %s has been approved.", groupName)
-		} else if request.Action == "decline" {
+			_, err = db.Exec(`UPDATE group_membership SET status = 'member' WHERE group_id = ? AND user_id = ? AND status = 'pending_request'`, req.GroupID, req.UserID)
+			if err != nil {
+				http.Error(w, "Failed to update join request", http.StatusInternalServerError)
+				return
+			}
+			notificationMsg = fmt.Sprintf("%s has accepted your request to join the group %s.", creatorNickname, groupName)
+		} else if req.Action == "decline" {
 			// Delete the pending request.
-			_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'pending_request'`, request.GroupID, request.UserID)
-			notificationMsg = fmt.Sprintf("Your request to join %s has been declined.", groupName)
+			_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'pending_request'`, req.GroupID, req.UserID)
+			if err != nil {
+				http.Error(w, "Failed to update join request", http.StatusInternalServerError)
+				return
+			}
+			notificationMsg = fmt.Sprintf("%s has declined your request to join the group %s.", creatorNickname, groupName)
 		} else {
 			http.Error(w, "Invalid action", http.StatusBadRequest)
 			return
 		}
 
-		if err != nil {
-			http.Error(w, "Failed to update join request", http.StatusInternalServerError)
-			return
-		}
-
-		// Delete the original join request notification so it won't reappear.
+		// Delete the original join request notification.
 		_, err = db.Exec(`
 			DELETE FROM notifications 
 			WHERE type = 'group_join_request' 
 			  AND user_id = ? 
 			  AND group_id = ? 
 			  AND related_user_id = ?`,
-			creatorID, request.GroupID, request.UserID)
+			creatorID, req.GroupID, req.UserID)
 		if err != nil {
 			http.Error(w, "Failed to delete join request notification", http.StatusInternalServerError)
 			return
 		}
 
-		// Notify the requester about the response.
-		err = notifications.CreateNotification(db, request.UserID, "group_join_request", notificationMsg, "", creatorID, request.GroupID, "")
+		// Notify the requester (User1) about the response.
+		err = notifications.CreateNotification(db, req.UserID, "group_join_response", notificationMsg, "", creatorID, req.GroupID, "")
 		if err != nil {
 			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
 			return
 		}
 
-		w.Write([]byte("Join request " + request.Action + "ed successfully"))
+		w.Write([]byte("Join request " + req.Action + "ed successfully"))
 	}
 }
+
 
 // Allows any group member to send invitations
 func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
@@ -507,7 +519,7 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Get user ID from session (this is the invitee)
+		// Get user ID from session (this is the invitee).
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -515,65 +527,82 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Parse the request body.
-		var request struct {
+		var req struct {
 			GroupID string `json:"group_id"`
 			Action  string `json:"action"` // "accept" or "decline"
 		}
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		if request.Action != "accept" && request.Action != "decline" {
+		if req.Action != "accept" && req.Action != "decline" {
 			http.Error(w, "Invalid action, must be 'accept' or 'decline'", http.StatusBadRequest)
 			return
 		}
 
-		// Fetch the group creator (to notify them)
-		var creatorID string
-		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&creatorID)
-		if err == sql.ErrNoRows {
-			http.Error(w, "Group not found", http.StatusNotFound)
+		// Retrieve the inviter's ID from the original invitation notification.
+		var inviterID string
+		err = db.QueryRow(`SELECT related_user_id FROM notifications WHERE type = 'group_invite' AND user_id = ? AND group_id = ?`, userID, req.GroupID).Scan(&inviterID)
+		if err != nil {
+			http.Error(w, "Failed to retrieve inviter information", http.StatusInternalServerError)
 			return
-		} else if err != nil {
+		}
+
+		// Retrieve the group name.
+		var groupName string
+		err = db.QueryRow(`SELECT name FROM groups WHERE id = ?`, req.GroupID).Scan(&groupName)
+		if err != nil {
 			http.Error(w, "Failed to retrieve group details", http.StatusInternalServerError)
 			return
 		}
 
-		var notificationMessage string
-		if request.Action == "accept" {
-			// Update the membership status to 'member'.
-			_, err = db.Exec(`UPDATE group_membership SET status = 'member' WHERE group_id = ? AND user_id = ? AND status = 'pending_invite'`, request.GroupID, userID)
-			notificationMessage = "Your invitation to join has been accepted."
-		} else {
-			// Delete the pending invitation.
-			_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'pending_invite'`, request.GroupID, userID)
-			notificationMessage = "Your invitation to join has been declined."
-		}
-
+		// Retrieve the invitee's nickname.
+		var inviteeNickname string
+		err = db.QueryRow(`SELECT nickname FROM users WHERE id = ?`, userID).Scan(&inviteeNickname)
 		if err != nil {
-			http.Error(w, "Failed to update invitation status", http.StatusInternalServerError)
+			http.Error(w, "Failed to retrieve your nickname", http.StatusInternalServerError)
 			return
 		}
 
-		// Delete the invitation notification (so it doesn’t show up again)
-		_, err = db.Exec(`DELETE FROM notifications WHERE type = 'group_invite' AND user_id = ? AND group_id = ?`, userID, request.GroupID)
+		// Process the invitation response.
+		var notificationMsg string
+		if req.Action == "accept" {
+			// Update the membership status to 'member'.
+			_, err = db.Exec(`UPDATE group_membership SET status = 'member' WHERE group_id = ? AND user_id = ? AND status = 'pending_invite'`, req.GroupID, userID)
+			if err != nil {
+				http.Error(w, "Failed to update invitation status", http.StatusInternalServerError)
+				return
+			}
+			notificationMsg = fmt.Sprintf("%s has accepted your invitation to join the group %s.", inviteeNickname, groupName)
+		} else { // decline
+			// Delete the pending invitation.
+			_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'pending_invite'`, req.GroupID, userID)
+			if err != nil {
+				http.Error(w, "Failed to update invitation status", http.StatusInternalServerError)
+				return
+			}
+			notificationMsg = fmt.Sprintf("%s has declined your invitation to join the group %s.", inviteeNickname, groupName)
+		}
+
+		// Delete the original invitation notification so it doesn't reappear.
+		_, err = db.Exec(`DELETE FROM notifications WHERE type = 'group_invite' AND user_id = ? AND group_id = ?`, userID, req.GroupID)
 		if err != nil {
 			http.Error(w, "Failed to delete invitation notification", http.StatusInternalServerError)
 			return
 		}
 
-		// Notify the group creator about the response.
-		err = notifications.CreateNotification(db, creatorID, "group_invite_response",
-			notificationMessage, "", userID, request.GroupID, "")
+		// Notify the inviter about the response.
+		err = notifications.CreateNotification(db, inviterID, "group_invite_response", notificationMsg, "", userID, req.GroupID, "")
 		if err != nil {
 			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
 			return
 		}
 
-		w.Write([]byte("Invitation " + request.Action + "ed successfully"))
+		w.Write([]byte("Invitation " + req.Action + "ed successfully"))
 	}
 }
+
 
 // LeaveGroupHandler - Allows users to leave a group
 func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
