@@ -119,19 +119,17 @@ func MarkUserOffline(db *sql.DB, userID string) error {
 
 func getFriendsStatus(db *sql.DB, userID string) ([]OnlineUser, error) {
 	query := `
-		SELECT DISTINCT u.id, u.nickname, u.avatar,
-			CASE WHEN us.status = 'online' THEN 1 ELSE 0 END AS online
-		FROM users u
-		LEFT JOIN user_status us ON u.id = us.user_id
-		WHERE (
-			u.id IN (
-				SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted'
-				UNION
-				SELECT follower_id FROM followers WHERE followed_id = ? AND status = 'accepted'
-			)
-		)
-		OR (u.private = 0 AND u.id != ?)
-	`
+	SELECT DISTINCT u.id, u.nickname, u.avatar,
+		CASE WHEN us.status = 'online' THEN 1 ELSE 0 END AS online
+	FROM users u
+	LEFT JOIN user_status us ON u.id = us.user_id
+	WHERE u.id IN (
+		SELECT followed_id FROM followers WHERE follower_id = ? AND status = 'accepted'
+		UNION
+		SELECT follower_id FROM followers WHERE followed_id = ? AND status = 'accepted'
+	)
+`
+
 	rows, err := db.Query(query, userID, userID, userID)
 	if err != nil {
 		return nil, err
