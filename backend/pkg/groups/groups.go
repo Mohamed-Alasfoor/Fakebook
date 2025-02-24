@@ -9,9 +9,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+
 	"social-network/pkg/notifications"
 	"social-network/pkg/sessions"
-	"strings"
 
 	"github.com/google/uuid"
 )
@@ -97,20 +98,32 @@ func GetGroupDetailsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Must be logged in
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
+		// group_id from query param => e.g. /groups/details?group_id=123
 		groupID := r.URL.Query().Get("group_id")
 		if groupID == "" {
 			http.Error(w, "Missing group_id", http.StatusBadRequest)
 			return
 		}
 
-		var groupName, groupDescription, createdAt string
-		err = db.QueryRow(`SELECT name, description, created_at FROM groups WHERE id = ?`, groupID).Scan(&groupName, &groupDescription, &createdAt)
+		// Fetch name, description, created_at, **and** creator_id
+		var (
+			groupName        string
+			groupDescription string
+			createdAt        string
+			creatorID        string
+		)
+		err = db.QueryRow(`
+            SELECT name, description, created_at, creator_id
+            FROM groups
+            WHERE id = ?
+        `, groupID).Scan(&groupName, &groupDescription, &createdAt, &creatorID)
 		if err == sql.ErrNoRows {
 			http.Error(w, "Group not found", http.StatusNotFound)
 			return
@@ -119,13 +132,24 @@ func GetGroupDetailsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Check if user is a member
+		// Check membership
 		var isMember bool
-		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_membership WHERE group_id = ? AND user_id = ? AND status = 'member')`, groupID, userID).Scan(&isMember)
+		err = db.QueryRow(`
+            SELECT EXISTS(
+                SELECT 1
+                FROM group_membership
+                WHERE group_id = ? AND user_id = ? AND status = 'member'
+            )
+        `, groupID, userID).Scan(&isMember)
+		if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
 
-		if err != nil || !isMember {
-			// Non-members can only see limited info
-			json.NewEncoder(w).Encode(map[string]string{
+		if !isMember {
+			// If not a member => partial info only (optional whether to reveal creator_id)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
 				"group_id":    groupID,
 				"name":        groupName,
 				"description": groupDescription,
@@ -135,9 +159,11 @@ func GetGroupDetailsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Members can see full details
-		json.NewEncoder(w).Encode(map[string]string{
+		// If user is a member => send full details including creator_id
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
 			"group_id":    groupID,
+			"creator_id":  creatorID, // <--- The crucial field!
 			"name":        groupName,
 			"description": groupDescription,
 			"created_at":  createdAt,
@@ -291,7 +317,6 @@ func RequestToJoinHandler(db *sql.DB) http.HandlerFunc {
 		_, err = db.Exec(`
 			INSERT INTO group_membership (id, group_id, user_id, status) 
 			VALUES (?, ?, ?, 'pending_request')`, uuid.New().String(), request.GroupID, userID)
-
 		if err != nil {
 			http.Error(w, "Failed to send join request", http.StatusInternalServerError)
 			return
@@ -406,7 +431,6 @@ func HandleJoinRequestHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Join request " + req.Action + "ed successfully"))
 	}
 }
-
 
 // Allows any group member to send invitations
 func SendInvitationHandler(db *sql.DB) http.HandlerFunc {
@@ -603,7 +627,6 @@ func HandleInvitationHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
 // LeaveGroupHandler - Allows users to leave a group
 func LeaveGroupHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -764,15 +787,18 @@ func RemoveMemberHandler(db *sql.DB) http.HandlerFunc {
 			GroupID string `json:"group_id"`
 			UserID  string `json:"user_id"`
 		}
-
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		// Verify if the logged-in user is the creator of the group
-		var ownerID string
-		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&ownerID)
+		if request.GroupID == "" || request.UserID == "" {
+			http.Error(w, "Missing group_id or user_id in request body", http.StatusBadRequest)
+			return
+		}
+
+		var groupCreatorID string
+		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&groupCreatorID)
 		if err == sql.ErrNoRows {
 			http.Error(w, "Group not found", http.StatusNotFound)
 			return
@@ -781,13 +807,16 @@ func RemoveMemberHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if ownerID != creatorID {
-			http.Error(w, "Unauthorized: Only the group creator can remove members", http.StatusForbidden)
+		if groupCreatorID != creatorID {
+			http.Error(w, "Forbidden: only the group creator can remove members", http.StatusForbidden)
 			return
 		}
 
-		//delete the user from the group
-		_, err = db.Exec(`DELETE FROM group_membership WHERE group_id = ? AND user_id = ?`, request.GroupID, request.UserID)
+		_, err = db.Exec(`
+            DELETE FROM group_membership 
+            WHERE group_id = ? 
+              AND user_id = ?
+        `, request.GroupID, request.UserID)
 		if err != nil {
 			http.Error(w, "Failed to remove member", http.StatusInternalServerError)
 			return
@@ -804,15 +833,37 @@ func DeleteGroupHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Get user ID (Must be the creator)
 		creatorID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		groupID := r.URL.Query().Get("group_id")
-		_, err = db.Exec(`DELETE FROM groups WHERE id = ? AND creator_id = ?`, groupID, creatorID)
+		var request struct {
+			GroupID string `json:"group_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		var groupCreatorID string
+		err = db.QueryRow(`SELECT creator_id FROM groups WHERE id = ?`, request.GroupID).Scan(&groupCreatorID)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Group not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			http.Error(w, "Failed to retrieve group information", http.StatusInternalServerError)
+			return
+		}
+
+		if groupCreatorID != creatorID {
+			http.Error(w, "Forbidden: only the creator can delete this group", http.StatusForbidden)
+			return
+		}
+
+		_, err = db.Exec(`DELETE FROM groups WHERE id = ? AND creator_id = ?`,
+			request.GroupID, creatorID)
 		if err != nil {
 			http.Error(w, "Failed to delete group", http.StatusInternalServerError)
 			return
@@ -1160,7 +1211,7 @@ func CreateGroupPostCommentHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		//word count limit
+		// word count limit
 		if len(request.Content) > 200 {
 			http.Error(w, "Content cannot exceed 200 words", http.StatusBadRequest)
 			return

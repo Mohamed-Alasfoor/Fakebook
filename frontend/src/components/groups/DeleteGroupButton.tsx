@@ -1,45 +1,73 @@
-// components/groups/DeleteGroupButton.tsx
 "use client";
 
+import React from "react";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
-import React, { useState } from "react";
-import Alert from "@/components/ui/alert";
-import { set } from "date-fns";
+import Swal from "sweetalert2";
+import withReactContent from "sweetalert2-react-content";
+
 interface DeleteGroupButtonProps {
   groupId: string;
-  onDelete?: () => void;
+  onDelete?: () => void; // Optional callback if you need to redirect or refresh
 }
 
+const MySwal = withReactContent(Swal);
+
 export function DeleteGroupButton({ groupId, onDelete }: DeleteGroupButtonProps) {
-  const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const handleDelete = async () => {
-    try {
-      const response = await axios.delete(`http://localhost:8080/groups/delete?group_id=${groupId}`, {
-        withCredentials: true,
-      });
-      setAlert({ type: "success", message: "Group deleted successfully!" });
-      if (onDelete) onDelete();
-    } catch (error: any) {
-      console.error("Error deleting group:", error);
-      setAlert({ type: "error", message: "Failed to delete group. Please try again." });
+    const result = await MySwal.fire({
+      title: "Delete Group?",
+      text: "Are you sure you want to delete this group?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#6C5CE7",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const response = await axios.delete("http://localhost:8080/groups/delete", {
+          data: { group_id: groupId },
+          withCredentials: true,
+        });
+
+        // Show success alert
+        await MySwal.fire({
+          title: "Group Deleted",
+          text: response.data, 
+          icon: "success",
+          confirmButtonColor: "#6C5CE7",
+        });
+
+        if (onDelete) onDelete();
+      } catch (error: any) {
+        console.error("Error deleting group:", error);
+
+        // If server says 403 => not the creator
+        if (error.response?.status === 403) {
+          await MySwal.fire({
+            title: "Forbidden",
+            text: "You are not the group creator. Only the creator can delete this group.",
+            icon: "error",
+            confirmButtonColor: "#6C5CE7",
+          });
+        } else {
+          await MySwal.fire({
+            title: "Error",
+            text: error.response?.data || "Error deleting group.",
+            icon: "error",
+            confirmButtonColor: "#6C5CE7",
+          });
+        }
+      }
     }
   };
 
   return (
-   
-    <> {alert && (
-      <Alert
-        title={alert.type === "success" ? "Success" : "Error"}
-        message={alert.message}
-        type={alert.type}
-        duration={5000}
-        onClose={() => setAlert(null)}
-      />
-    )}
-      <Button variant="destructive" onClick={handleDelete}>
+    <Button  onClick={handleDelete}>
       Delete Group
     </Button>
-    </>
   );
 }
