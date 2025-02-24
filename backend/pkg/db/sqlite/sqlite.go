@@ -10,36 +10,60 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file" // File-based migrations
 )
 
-// ConnectDB initializes and returns a SQLite database connection.
+// ConnectDB initializes and returns a SQLite database connection with proper settings.
 func ConnectDB() *sql.DB {
-	db, err := sql.Open("sqlite", "./social_network.db") // Create SQLite database file
+	// Set busy timeout to 5 seconds to prevent immediate lock errors
+	dsn := "./social_network.db?_busy_timeout=5000"
+
+	db, err := sql.Open("sqlite", dsn) // Open SQLite with timeout settings
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+
+	// Enable WAL (Write-Ahead Logging) mode for better concurrency
+	_, err = db.Exec("PRAGMA journal_mode=WAL;")
+	if err != nil {
+		log.Fatalf("Failed to set WAL mode: %v", err)
+	}
+
+	// Increase cache size (Optional: Helps performance)
+	_, err = db.Exec("PRAGMA cache_size = 10000;")
+	if err != nil {
+		log.Fatalf("Failed to set cache size: %v", err)
+	}
+
+	// Ensure foreign keys are enabled (Optional: Good practice)
+	_, err = db.Exec("PRAGMA foreign_keys = ON;")
+	if err != nil {
+		log.Fatalf("Failed to enable foreign keys: %v", err)
+	}
+
+	log.Println("Connected to SQLite database successfully.")
 	return db
 }
 
-// ApplyMigrations applies database migrations.
+// ApplyMigrations applies database migrations safely.
 func ApplyMigrations(db *sql.DB) {
-	// Create a migration driver for SQLite
+	// Use the existing database connection
 	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
 	if err != nil {
 		log.Fatalf("Failed to create migration driver: %v", err)
 	}
 
-	// Point to the migration files directory
+	// Use the correct driver name "sqlite" instead of "sqlite3"
 	m, err := migrate.NewWithDatabaseInstance(
-    "file://pkg/db/migrations", 
-    "sqlite3",
-    driver,
-)
+		"file://pkg/db/migrations",
+		"sqlite", // Correct driver name for migrate
+		driver,
+	)
 
 	if err != nil {
 		log.Fatalf("Failed to initialize migrations: %v", err)
 	}
 
 	// Apply migrations
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	err = m.Up()
+	if err != nil && err != migrate.ErrNoChange {
 		log.Fatalf("Failed to apply migrations: %v", err)
 	}
 

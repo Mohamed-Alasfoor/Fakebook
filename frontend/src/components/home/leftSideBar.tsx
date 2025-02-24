@@ -9,6 +9,7 @@ import { handleLogout } from "@/lib/functions/logout";
 import { useRouter } from "next/navigation";
 import { useUserProfile } from "@/lib/hooks/swr/getUserProfile";
 import Cookies from "js-cookie";
+import LoadingSpinner from "../ui/loading-spinner";
 
 interface LeftSidebarProps {
   isOpen: boolean;
@@ -96,11 +97,9 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
       {/* Profile Section */}
       <div className="pt-4 border-t border-white/10 mt-auto">
         {isLoading ? (
-          <p className="text-center text-sm">Loading profile...</p>
+          <LoadingSpinner size="small" color="white"/>
         ) : isError || !user ? (
-          <p className="text-center text-red-500 text-sm">
-            Error loading profile
-          </p>
+          <LoadingSpinner size="small" color="white"/>
         ) : (
           <div
             className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-white/10 rounded-lg"
