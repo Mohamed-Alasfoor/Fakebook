@@ -12,7 +12,7 @@ interface Notification {
   type: string;
   content: string;
   post_id?: string;
-  related_user_id?: string; // For join requests, this is the requester’s ID.
+  related_user_id?: string; // For follow requests, this is the requester’s ID.
   group_id?: string;
   event_id?: string;
   read: boolean;
@@ -90,7 +90,35 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     }
   };
 
-  // Generic handler for group join requests and invites
+  // Handle follow request responses (for private profiles)
+  const handleFollowRequest = async (
+    notification: Notification,
+    action: "accept" | "decline"
+  ) => {
+    try {
+      const res = await fetch("http://localhost:8080/follow/request", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          follower_id: notification.related_user_id, // requester’s ID
+          action,
+        }),
+      });
+      if (res.ok) {
+        // Remove notification from list upon successful handling
+        setNotifications((prev) =>
+          prev.filter((n) => n.id !== notification.id)
+        );
+      } else {
+        console.error("Failed to handle follow request, status:", res.status);
+      }
+    } catch (error) {
+      console.error("Error handling follow request", error);
+    }
+  };
+
+  // Generic handler for group join requests and invites remains unchanged
   const handleGroupRequest = async (
     notification: Notification,
     action: "accept" | "decline"
@@ -98,15 +126,11 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     let endpoint = "";
     let payload: any = { action };
 
-    console.log("Handling group request for:", notification, "action:", action);
-
     if (notification.type === "group_join_request") {
-      // Note: our server endpoint is registered as "/groups/join/respond"
       endpoint = "http://localhost:8080/groups/join/respond";
       payload.group_id = notification.group_id;
       payload.user_id = notification.related_user_id; // requester’s ID
     } else if (notification.type === "group_invite") {
-      // Note: our server endpoint is registered as "/groups/invite/respond"
       endpoint = "http://localhost:8080/groups/invite/respond";
       payload.group_id = notification.group_id;
     } else {
@@ -118,7 +142,6 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     }
 
     try {
-      console.log("Sending request to:", endpoint, "with payload:", payload);
       const res = await fetch(endpoint, {
         method: "PUT",
         credentials: "include",
@@ -126,7 +149,6 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        console.log("Group request handled successfully");
         setNotifications((prev) =>
           prev.filter((n) => n.id !== notification.id)
         );
@@ -217,17 +239,40 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                   </div>
                 </div>
 
-                {/* Render buttons for actionable group notifications */}
-                {["group_join_request", "group_invite"].includes(
-                  notification.type
-                ) &&
+                {/* Render buttons for actionable notifications */}
+                {notification.type === "group_join_request" ||
+                notification.type === "group_invite" ? (
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      className="w-full border-green-400 text-green-400 hover:bg-green-500 hover:text-white flex items-center gap-1"
+                      variant="outline"
+                      onClick={() => handleGroupRequest(notification, "accept")}
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      Accept
+                    </Button>
+                    <Button
+                      className="w-full border-red-400 text-red-400 hover:bg-red-500 hover:text-white flex items-center gap-1"
+                      variant="outline"
+                      onClick={() =>
+                        handleGroupRequest(notification, "decline")
+                      }
+                    >
+                      <UserX className="w-4 h-4" />
+                      Decline
+                    </Button>
+                  </div>
+                ) : null}
+
+                {/* Render buttons for follow request notifications */}
+                {notification.type === "follow_request" &&
                   currentUserId === notification.user_id && (
                     <div className="flex gap-2 mt-2">
                       <Button
                         className="w-full border-green-400 text-green-400 hover:bg-green-500 hover:text-white flex items-center gap-1"
                         variant="outline"
                         onClick={() =>
-                          handleGroupRequest(notification, "accept")
+                          handleFollowRequest(notification, "accept")
                         }
                       >
                         <UserCheck className="w-4 h-4" />
@@ -237,7 +282,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                         className="w-full border-red-400 text-red-400 hover:bg-red-500 hover:text-white flex items-center gap-1"
                         variant="outline"
                         onClick={() =>
-                          handleGroupRequest(notification, "decline")
+                          handleFollowRequest(notification, "decline")
                         }
                       >
                         <UserX className="w-4 h-4" />

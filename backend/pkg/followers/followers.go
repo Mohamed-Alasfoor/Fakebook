@@ -268,7 +268,8 @@ func GetFollowersHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// HandleFollowRequest allows the logged-in user to accept or decline follow requests
+// HandleFollowRequest allows the logged-in user (private profile owner)
+// to accept or decline follow requests.
 func HandleFollowRequest(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
