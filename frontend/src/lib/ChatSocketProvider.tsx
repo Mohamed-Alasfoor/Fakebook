@@ -2,13 +2,7 @@
 
 import NotificationPopup from "@/components/Notifications/notification-popup";
 import Cookies from "js-cookie";
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
 export interface ChatMessage {
   id: string;
@@ -17,7 +11,7 @@ export interface ChatMessage {
   message: string;
   type: string;
   created_at: string;
-  sender_name : string;
+  sender_name: string;
 }
 
 interface ChatSocketContextValue {
@@ -26,16 +20,9 @@ interface ChatSocketContextValue {
   messages: ChatMessage[];
 }
 
-const ChatSocketContext = createContext<ChatSocketContextValue | undefined>(
-  undefined
-);
+const ChatSocketContext = createContext<ChatSocketContextValue | undefined>(undefined);
 
-export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  // if(!Cookies.get("user_id")){
-  //   return
-  // }
+export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [latestMessage, setLatestMessage] = useState<ChatMessage | null>(null);
@@ -43,6 +30,14 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   const connectedRef = useRef(false);
 
   useEffect(() => {
+    const userId = Cookies.get("user_id");
+
+    // Prevent connection if user is not logged in
+    if (!userId) {
+      console.warn("User not logged in, skipping chat WebSocket connection");
+      return;
+    }
+
     if (connectedRef.current) return;
     connectedRef.current = true;
 
@@ -50,32 +45,32 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     const connect = () => {
-      console.log("🔄 Connecting to private chat WebSocket...");
+      console.log("🔄 Connecting to chat WebSocket...");
       socket = new WebSocket("ws://localhost:8080/chat/private");
 
       socket.onopen = () => {
-        console.log("✅ Connected to private chat WebSocket");
+        console.log("✅ Connected to chat WebSocket");
       };
 
       socket.onmessage = (event) => {
-        console.log("📩 Private chat message received:", event.data);
+        console.log("📩 Chat message received:", event.data);
 
         try {
           const data: ChatMessage = JSON.parse(event.data);
           setMessages((prev) => [...prev, data]);
-          setLatestMessage(data); // Set latest message to trigger notification
+          setLatestMessage(data);
         } catch (e) {
-          console.error("Error parsing private chat message", e);
+          console.error("Error parsing chat message", e);
         }
       };
 
       socket.onerror = (error) => {
-        console.error("❌ Private chat WebSocket error:", error);
+        console.error("❌ Chat WebSocket error:", error);
         reconnectTimer = setTimeout(connect, 5000);
       };
 
       socket.onclose = () => {
-        console.warn("⚠️ Private chat WebSocket closed. Reconnecting in 5s...");
+        console.warn("⚠️ Chat WebSocket closed. Reconnecting in 5s...");
         reconnectTimer = setTimeout(connect, 5000);
       };
 
