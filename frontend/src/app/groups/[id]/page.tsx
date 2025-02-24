@@ -29,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Alert from "@/components/ui/alert";
 import { set } from "date-fns";
+import LoadingSpinner from "@/components/ui/loading-spinner";
 interface ChatMessage {
   sender_id: string;
   message: string;
@@ -334,7 +335,7 @@ export default function GroupView() {
   if (isLoading)
     return (
       <div className="text-center py-10 text-gray-500">
-        Loading group details...
+        <LoadingSpinner size="large"/>
       </div>
     );
   if (!group)

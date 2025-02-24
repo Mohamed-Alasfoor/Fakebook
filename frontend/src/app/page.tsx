@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MainContent } from "@/components/home/mainContent";
 import { checkAuth } from "@/lib/hooks/checkAuth";
+import LoadingSpinner from "@/components/ui/loading-spinner";
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
@@ -16,8 +17,8 @@ export default function Home() {
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
-        Checking authentication...
-      </div>
+          <LoadingSpinner size="large"/>
+        </div>
     );
   }
 

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import LoadingSpinner from "@/components/ui/loading-spinner";
 
 export default function SettingsPage() {
   // Prevent hydration mismatches.
@@ -143,7 +144,7 @@ export default function SettingsPage() {
       </div>
     );
   }
-  if (isLoading) return <div>Loading your profile...</div>;
+  if (isLoading) return <LoadingSpinner size="large"/>;
   if (isError) return <div>Error loading profile.</div>;
 
   return (

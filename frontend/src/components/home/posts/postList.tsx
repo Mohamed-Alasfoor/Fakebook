@@ -1,5 +1,6 @@
 import { useLikes } from "@/lib/hooks/useLikes";
 import PostItem from "@/components/home/posts/postItem";
+import LoadingSpinner from "@/components/ui/loading-spinner";
 
 interface PostsListProps {
   posts: any[];
@@ -12,7 +13,7 @@ interface PostsListProps {
 export default function PostsList({ posts, isLoading, isError, onSelectPost, refreshPosts }: PostsListProps) {
   const { likesState, likesCount, handleLike } = useLikes(posts || [], refreshPosts); // Ensure `posts` is always an array
 
-  if (isLoading) return <div>Loading posts...</div>;
+  if (isLoading) return <LoadingSpinner size="large"/>;
   if (isError) return <div className="text-red-500">Error loading posts. Please try again later.</div>;
 
   if (!Array.isArray(posts)) {

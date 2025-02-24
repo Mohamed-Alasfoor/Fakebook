@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import axios from "axios";
 import Alert from "@/components/ui/alert";
 import { useState } from "react";
+import LoadingSpinner from "@/components/ui/loading-spinner";
 export default function ProfilePage() {
   const params = useParams();
   const userId = params?.id as string | undefined;
   const { user, isLoading, isError } = useUserProfile(userId);
   const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   if (!userId) return <p className="text-center text-red-500">Invalid user ID.</p>;
-  if (isLoading) return <p className="text-center">Loading profile...</p>;
+  if (isLoading) return <LoadingSpinner size="large"/>;
   if (isError) return <p className="text-center text-red-500">Error loading profile.</p>;
   const followRequest = async (followedId: string) => {
     try {
