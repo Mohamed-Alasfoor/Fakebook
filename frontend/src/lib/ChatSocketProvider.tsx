@@ -1,6 +1,7 @@
 "use client";
 
 import NotificationPopup from "@/components/Notifications/notification-popup";
+import Cookies from "js-cookie";
 import React, {
   createContext,
   useContext,
@@ -32,6 +33,9 @@ const ChatSocketContext = createContext<ChatSocketContextValue | undefined>(
 export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  if(!Cookies.get("user_id")){
+    return
+  }
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [latestMessage, setLatestMessage] = useState<ChatMessage | null>(null);

@@ -36,8 +36,7 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          {/* Wrap everything in ChatSocketProvider so it doesn't unmount */}
-          <ChatSocketProvider>{children}</ChatSocketProvider>
+          {children}
         </body>
       </html>
     );
