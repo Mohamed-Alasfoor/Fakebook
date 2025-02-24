@@ -95,8 +95,10 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
   // Handle follow request responses (for private profiles)
   const handleFollowRequest = async (
     notification: Notification,
-    action: "accept" | "decline"
+    action: "accept" | "decline",
+    e: React.MouseEvent<HTMLButtonElement>
   ) => {
+    e.stopPropagation();
     try {
       const res = await fetch("http://localhost:8080/follow/request", {
         method: "PUT",
@@ -123,8 +125,10 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
   // Generic handler for group join requests and invites
   const handleGroupRequest = async (
     notification: Notification,
-    action: "accept" | "decline"
+    action: "accept" | "decline",
+    e: React.MouseEvent<HTMLButtonElement>
   ) => {
+    e.stopPropagation();
     let endpoint = "";
     let payload: any = { action };
 
@@ -215,6 +219,11 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
             {notifications.map((notification) => (
               <li
                 key={notification.id}
+                onClick={() => {
+                  if (!notification.read) {
+                    markNotificationAsRead(notification.id);
+                  }
+                }}
                 className={`
                   flex flex-col p-4 rounded-xl shadow-md transition transform hover:scale-105 cursor-pointer
                   ${notification.read ? "bg-white/10" : "bg-white/20"}
@@ -254,7 +263,9 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                     <Button
                       className="w-full border-green-400 text-green-400 hover:bg-green-500 hover:text-white flex items-center gap-1"
                       variant="outline"
-                      onClick={() => handleGroupRequest(notification, "accept")}
+                      onClick={(e) =>
+                        handleGroupRequest(notification, "accept", e)
+                      }
                     >
                       <UserCheck className="w-4 h-4" />
                       Accept
@@ -262,8 +273,8 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                     <Button
                       className="w-full border-red-400 text-red-400 hover:bg-red-500 hover:text-white flex items-center gap-1"
                       variant="outline"
-                      onClick={() =>
-                        handleGroupRequest(notification, "decline")
+                      onClick={(e) =>
+                        handleGroupRequest(notification, "decline", e)
                       }
                     >
                       <UserX className="w-4 h-4" />
@@ -279,8 +290,8 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                       <Button
                         className="w-full border-green-400 text-green-400 hover:bg-green-500 hover:text-white flex items-center gap-1"
                         variant="outline"
-                        onClick={() =>
-                          handleFollowRequest(notification, "accept")
+                        onClick={(e) =>
+                          handleFollowRequest(notification, "accept", e)
                         }
                       >
                         <UserCheck className="w-4 h-4" />
@@ -289,8 +300,8 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                       <Button
                         className="w-full border-red-400 text-red-400 hover:bg-red-500 hover:text-white flex items-center gap-1"
                         variant="outline"
-                        onClick={() =>
-                          handleFollowRequest(notification, "decline")
+                        onClick={(e) =>
+                          handleFollowRequest(notification, "decline", e)
                         }
                       >
                         <UserX className="w-4 h-4" />
