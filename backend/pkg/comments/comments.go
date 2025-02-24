@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// Comment represents a comment without user-specific display info.
 type Comment struct {
 	ID        string `json:"id"`
 	PostID    string `json:"post_id"`
@@ -23,112 +24,121 @@ type Comment struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// AddCommentHandler allows a user to add a comment, including optional images
+// AddCommentHandler allows a user to add a comment, including optional images.
 func AddCommentHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != http.MethodPost {
-            http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
 
-        // Parse multipart form with a max upload size (e.g., 10MB)
-        const maxUploadSize = 10 << 20 // 10 MB
-        err := r.ParseMultipartForm(maxUploadSize)
-        if err != nil {
-            http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
-            return
-        }
+		// Parse multipart form with a max upload size (e.g., 10MB)
+		const maxUploadSize = 10 << 20 // 10 MB
+		err := r.ParseMultipartForm(maxUploadSize)
+		if err != nil {
+			http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 
-        // Retrieve user ID from session
-        userID, err := sessions.GetUserIDFromSession(r)
-        if err != nil {
-            http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
-            return
-        }
+		// Retrieve user ID from session
+		userID, err := sessions.GetUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
 
-        // Retrieve form values
-        postID := r.FormValue("post_id")
-        content := r.FormValue("content")
+		// Retrieve form values
+		postID := r.FormValue("post_id")
+		content := r.FormValue("content")
 
-        if postID == "" || content == "" {
-            http.Error(w, "Post ID and content are required", http.StatusBadRequest)
-            return
-        }
+		if postID == "" || content == "" {
+			http.Error(w, "Post ID and content are required", http.StatusBadRequest)
+			return
+		}
 
-				//word count limit
-				if len(content) > 250 {
-					http.Error(w, "Content cannot exceed 250 characters", http.StatusBadRequest)
-					return
+		// Enforce word count limit (max 250 characters)
+		if len(content) > 250 {
+			http.Error(w, "Content cannot exceed 250 characters", http.StatusBadRequest)
+			return
+		}
+
+		// Handle file upload (optional)
+		var imageURL string
+		file, fileHeader, err := r.FormFile("file")
+		if err == nil { // File exists
+			defer file.Close()
+
+			allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif"}
+			fileExt := strings.ToLower(filepath.Ext(fileHeader.Filename))
+			if !contains(allowedExtensions, fileExt) {
+				http.Error(w, "Invalid file type. Only .jpg, .jpeg, .png, and .gif are allowed.", http.StatusBadRequest)
+				return
 			}
 
-        // Handle file upload (optional)
-        var imageURL string
-        file, fileHeader, err := r.FormFile("file")
-        if err == nil { // File exists
-            defer file.Close()
+			// Save file
+			fileName := uuid.New().String() + fileExt
+			savePath := filepath.Join("uploads", fileName)
+			outFile, err := os.Create(savePath)
+			if err != nil {
+				http.Error(w, "Failed to save file", http.StatusInternalServerError)
+				return
+			}
+			defer outFile.Close()
 
-            allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif"}
-            fileExt := strings.ToLower(filepath.Ext(fileHeader.Filename))
-            if !contains(allowedExtensions, fileExt) {
-                http.Error(w, "Invalid file type. Only .jpg, .jpeg, .png, and .gif are allowed.", http.StatusBadRequest)
-                return
-            }
+			if _, err := io.Copy(outFile, file); err != nil {
+				http.Error(w, "Failed to write file", http.StatusInternalServerError)
+				return
+			}
 
-            // Save file
-            fileName := uuid.New().String() + fileExt
-            savePath := filepath.Join("uploads", fileName)
-            outFile, err := os.Create(savePath)
-            if err != nil {
-                http.Error(w, "Failed to save file", http.StatusInternalServerError)
-                return
-            }
-            defer outFile.Close()
+			imageURL = fileName
+		}
 
-            if _, err := io.Copy(outFile, file); err != nil {
-                http.Error(w, "Failed to write file", http.StatusInternalServerError)
-                return
-            }
+		// Generate a unique comment ID
+		commentID := uuid.New().String()
 
-            imageURL = fileName
-        }
-
-        // Generate a unique comment ID
-        commentID := uuid.New().String()
-
-        // Insert the comment into the database
-        query := `
-            INSERT INTO comments (id, post_id, user_id, content, image_url)
-            VALUES (?, ?, ?, ?, ?)
-        `
+		// Insert the comment into the database
+		query := `
+			INSERT INTO comments (id, post_id, user_id, content, image_url)
+			VALUES (?, ?, ?, ?, ?)
+		`
 		_, err = db.Exec(query, commentID, postID, userID, content, imageURL)
 		if err != nil {
 			http.Error(w, "Failed to add comment: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		
 
-        // Fetch the owner of the post
-        var postOwnerID string
-        err = db.QueryRow(`SELECT user_id FROM posts WHERE id = ?`, postID).Scan(&postOwnerID)
-        if err != nil {
-            http.Error(w, "Failed to retrieve post owner", http.StatusInternalServerError)
-            return
-        }
+		// Fetch the owner of the post
+		var postOwnerID string
+		err = db.QueryRow(`SELECT user_id FROM posts WHERE id = ?`, postID).Scan(&postOwnerID)
+		if err != nil {
+			http.Error(w, "Failed to retrieve post owner", http.StatusInternalServerError)
+			return
+		}
 
-        // Send notification to the post owner
-				if userID != postOwnerID {
-            err = notifications.CreateNotification(db, postOwnerID, "comment", "Your post was commented on", postID, userID, "", "")
-            if err != nil {
-                http.Error(w, "Failed to create notification", http.StatusInternalServerError)
-                return
-            }
-        }
+		// If the commenter is not the post owner, create a notification.
+		if userID != postOwnerID {
+			// Fetch the commenter's nickname
+			var nickname string
+			err = db.QueryRow(`SELECT nickname FROM users WHERE id = ?`, userID).Scan(&nickname)
+			if err != nil {
+				nickname = "Someone" // Fallback value if nickname isn't found
+			}
 
-        w.WriteHeader(http.StatusCreated)
-        w.Write([]byte("Comment added successfully"))
-    }
+			// Create a custom message like "Nickname has commented on your post"
+			message := nickname + " has commented on your post"
+
+			// Send notification to the post owner
+			err = notifications.CreateNotification(db, postOwnerID, "comment", message, postID, userID, "", "")
+			if err != nil {
+				http.Error(w, "Failed to create notification", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte("Comment added successfully"))
+	}
 }
-
 
 // DeleteCommentHandler allows a user to delete their own comment
 func DeleteCommentHandler(db *sql.DB) http.HandlerFunc {
