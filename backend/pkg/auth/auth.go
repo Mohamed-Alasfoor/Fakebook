@@ -3,6 +3,7 @@ package auth
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -33,12 +34,12 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
 
 		// Extract JSON fields
 		user := User{
-			Email:      r.FormValue("email"),
-			Password:   r.FormValue("password"),
-			FirstName:  r.FormValue("first_name"),
-			LastName:   r.FormValue("last_name"),
-			Nickname:   r.FormValue("nickname"),
-			AboutMe:    r.FormValue("about_me"),
+			Email:       r.FormValue("email"),
+			Password:    r.FormValue("password"),
+			FirstName:   r.FormValue("first_name"),
+			LastName:    r.FormValue("last_name"),
+			Nickname:    r.FormValue("nickname"),
+			AboutMe:     r.FormValue("about_me"),
 			DateOfBirth: r.FormValue("date_of_birth"),
 		}
 
@@ -59,6 +60,28 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		user.Password = hashedPassword
+
+		// Auto-generate a nickname if it's empty
+		if strings.TrimSpace(user.Nickname) == "" {
+			baseNickname := strings.Split(user.Email, "@")[0]
+			nicknameCandidate := baseNickname
+			count := 1
+			for {
+				var exists bool
+				err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE nickname = ?)", nicknameCandidate).Scan(&exists)
+				if err != nil {
+					log.Println("Failed to check duplicate nickname:", err)
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+				if !exists {
+					break
+				}
+				count++
+				nicknameCandidate = fmt.Sprintf("%s%d", baseNickname, count)
+			}
+			user.Nickname = nicknameCandidate
+		}
 
 		// Handle avatar upload
 		avatarFile, avatarHeader, err := r.FormFile("avatar")
@@ -127,6 +150,7 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
 		})
 	}
 }
+
 
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
