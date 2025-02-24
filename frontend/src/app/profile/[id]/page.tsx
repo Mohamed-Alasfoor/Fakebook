@@ -7,12 +7,13 @@ import ProfileTabs from "@/components/profile/profileTabs";
 import { LockIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
-
+import Alert from "@/components/ui/alert";
+import { useState } from "react";
 export default function ProfilePage() {
   const params = useParams();
   const userId = params?.id as string | undefined;
   const { user, isLoading, isError } = useUserProfile(userId);
-
+  const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   if (!userId) return <p className="text-center text-red-500">Invalid user ID.</p>;
   if (isLoading) return <p className="text-center">Loading profile...</p>;
   if (isError) return <p className="text-center text-red-500">Error loading profile.</p>;
@@ -28,9 +29,9 @@ export default function ProfilePage() {
           },
         }
       );
-      alert("Follow Response: " + response.data);
+        setAlert({ type: "success", message: "User followed successfully" });
     } catch (error) {
-      alert("Error following user");
+        setAlert({ type: "error", message: "Failed to follow user" });
     }
   };
   // Handle Private Profile Case
@@ -57,10 +58,22 @@ export default function ProfilePage() {
   }
 
   return (
+    <>
+    {alert && (
+        <Alert
+          title={alert.type === "success" ? "Success" : "Error"}
+          message={alert.message}
+          type={alert.type}
+          duration={5000}
+          onClose={() => setAlert(null)}
+        />
+      )}
     <div className="w-full max-w-3xl mx-auto px-4 md:px-6 lg:px-8 py-6">
       <ProfileHeader user={user} />
       <ProfileTabs user={user} />
     </div>
+    </>
+    
   );
 }
 

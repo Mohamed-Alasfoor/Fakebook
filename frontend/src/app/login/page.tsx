@@ -10,27 +10,43 @@ import { PasswordInput } from "@/components/auth/password"
 import { useState } from "react"
 import axios from "axios"
 import { useRouter } from "next/navigation"
+import Alert from "@/components/ui/alert";
 export default function LoginPage() {
     axios.defaults.withCredentials = true;
     const router = useRouter();
     const [identifier,setIdentifier] = useState("");
     const [password,setPassword] = useState("");
-    const handleLogin = async (e:any) => {
-        e.preventDefault();
-        try{
+    const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      try {
           const res = await axios.post('http://localhost:8080/login', { identifier, password });
           router.push('/');
-        }catch(err){
-            alert(err);
-        }
-    }
+      } catch (err) {
+          if (axios.isAxiosError(err) && err.response) {
+              setAlert({ type: "error", message: err.response.data });
+          } else {
+              setAlert({ type: "error", message: "An unexpected error occurred" });
+          }
+      }
+  }
 
 
 
 
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Enter your credentials to access your account" >
+   <>
+    {alert && (
+        <Alert
+          title={alert.type === "success" ? "Success" : "Error"}
+          message={alert.message}
+          type={alert.type}
+          duration={5000}
+          onClose={() => setAlert(null)}
+        />
+      )}
+     <AuthLayout title="Welcome back" subtitle="Enter your credentials to access your account" >
       <div className="space-y-6">
         <form className="space-y-4" onSubmit={handleLogin}>
           <div className="space-y-2">
@@ -72,6 +88,7 @@ export default function LoginPage() {
         </p>
       </div>
     </AuthLayout>
+   </>
   )
 }
 

@@ -3,12 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import axios from "axios";
 import { CalendarIcon, UserIcon, UsersIcon, LockIcon } from "lucide-react";
+import Alert from "@/components/ui/alert";
+import { useState } from "react";
+import { set } from "date-fns";
 
 interface ProfileHeaderProps {
   user: any;
 }
 
 export default function ProfileHeader({ user }: ProfileHeaderProps) {
+  const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -30,9 +34,9 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
           },
         }
       );
-      alert("Follow Response: " + response.data);
+      setAlert({ type: "success", message: "User followed successfully!" });
     } catch (error) {
-      alert("Error following user");
+      setAlert({ type: "error", message: "Error following user" });
     }
   };
 
@@ -45,14 +49,24 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
           "Content-Type": "application/json",
         },
       });
-      alert(response.data);
+      setAlert({ type: "success", message: "User unfollowed successfully!" });
     } catch (error) {
-      alert("Error unfollowing user");
+      setAlert({ type: "error", message: "Error unfollowing user" });
     }
   };
 
   return (
-    <Card className="mb-8">
+    <>
+    {alert && (
+        <Alert
+          title={alert.type === "success" ? "Success" : "Error"}
+          message={alert.message}
+          type={alert.type}
+          duration={5000}
+          onClose={() => setAlert(null)}
+        />
+      )}
+      <Card className="mb-8">
       <CardContent className="pt-6">
         <div className="flex flex-col items-center md:flex-row md:items-start gap-6">
           <Avatar className="w-32 h-32">
@@ -119,6 +133,7 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
         </div>
       </CardContent>
     </Card>
+    </>
   );
 }
 

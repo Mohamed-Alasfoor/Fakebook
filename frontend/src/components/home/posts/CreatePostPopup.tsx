@@ -21,6 +21,8 @@ import { X, Image, Globe, Lock, Users, User } from "lucide-react";
 import axios from "axios";
 import { useFollowers } from "@/lib/hooks/swr/useFollowers";
 import Cookies from "js-cookie";
+import Alert from "@/components/ui/alert";
+import { set } from "date-fns";
 
 interface CreatePostPopupProps {
   isOpen: boolean;
@@ -38,6 +40,7 @@ export function CreatePostPopup({
   const [privacy, setPrivacy] = useState("public");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const maxChars = 500; // Maximum allowed characters
 
   // Get logged-in user's ID from cookies and fetch real followers
@@ -64,7 +67,7 @@ export function CreatePostPopup({
   const handleSubmit = async () => {
     try {
       if (!content.trim()) {
-        alert("Content cannot be empty");
+        setAlert({ type: "info", message: "Content cannot be empty." });
         return;
       }
 
@@ -92,7 +95,7 @@ export function CreatePostPopup({
       }
 
       const result = await response.json();
-      alert("Post created successfully!");
+      setAlert({ type: "success", message: "Post created successfully!" });
 
       onCreatePost((prevPosts: any[]) =>
         Array.isArray(prevPosts) ? [result, ...prevPosts] : [result]
@@ -106,12 +109,22 @@ export function CreatePostPopup({
       onClose();
     } catch (error) {
       console.error("Error creating post:", error);
-      alert("Failed to create post. Please try again.");
+      setAlert({ type: "error", message: "Failed to create post." });
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+   <>
+    {alert && (
+        <Alert
+          title={alert.type === "success" ? "Success" : "Error"}
+          message={alert.message}
+          type={alert.type}
+          duration={5000}
+          onClose={() => setAlert(null)}
+        />
+      )}
+     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
@@ -240,5 +253,6 @@ export function CreatePostPopup({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+   </>
   );
 }

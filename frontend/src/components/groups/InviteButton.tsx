@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-
+import Alert from "@/components/ui/alert";
+import { set } from "date-fns";
 interface InviteButtonProps {
   groupId: string;
   // Optional callback to run after a successful invite (e.g. to refresh group data)
@@ -24,10 +25,10 @@ export function InviteButton({ groupId, onInviteSuccess }: InviteButtonProps) {
   const [open, setOpen] = useState(false);
   const [nickname, setNickname] = useState("");
   const [loading, setLoading] = useState(false);
-
+  const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const handleInvite = async () => {
     if (!nickname.trim()) {
-      alert("Please enter a nickname.");
+      setAlert({ type: "error", message: "Please enter a nickname." });
       return;
     }
 
@@ -38,22 +39,31 @@ export function InviteButton({ groupId, onInviteSuccess }: InviteButtonProps) {
         { group_id: groupId, nickname },
         { withCredentials: true }
       );
-      alert(response.data);
+      setAlert({ type: "success", message: "Invite sent successfully!" });
       setNickname("");
       setOpen(false);
       if (onInviteSuccess) {
         onInviteSuccess();
       }
     } catch (error: any) {
-      console.error("Error sending invite:", error);
-      alert(error.response?.data || "Failed to send invite. Please try again.");
+      setAlert({ type: "error", message: "Failed to invite member. Please try again." });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+   <>
+   {alert && (
+        <Alert
+          title={alert.type === "success" ? "Success" : "Error"}
+          message={alert.message}
+          type={alert.type}
+          duration={5000}
+          onClose={() => setAlert(null)}
+        />
+      )}
+     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" className="bg-[#6C5CE7] text-white">
           Invite Member
@@ -77,5 +87,6 @@ export function InviteButton({ groupId, onInviteSuccess }: InviteButtonProps) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+   </>
   );
 }

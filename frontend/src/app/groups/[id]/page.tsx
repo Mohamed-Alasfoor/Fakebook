@@ -27,7 +27,8 @@ import { Group, Post, Member, Event, RSVPStatus } from "@/types/groupTypes";
 import { useWebSocket } from "@/lib/hooks/use-web-socket";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
+import Alert from "@/components/ui/alert";
+import { set } from "date-fns";
 interface ChatMessage {
   sender_id: string;
   message: string;
@@ -53,7 +54,7 @@ export default function GroupView() {
   const [eventDescription, setEventDescription] = useState("");
   const [eventDateTime, setEventDateTime] = useState("");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-
+  const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   // --- Chat States & Refs ---
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -126,7 +127,10 @@ export default function GroupView() {
   // --- Create Post ---
   const handleCreatePost = async () => {
     if (!postContent.trim()) {
-      return alert("Post content cannot be empty.");
+      return setAlert({
+        type: "error",
+        message: "Post content cannot be empty.",
+      });
     }
     const formData = new FormData();
     formData.append("group_id", params.id as string);
@@ -157,8 +161,10 @@ export default function GroupView() {
       setPostFile(null);
       setIsCreatingPost(false);
     } catch (error) {
-      console.error("Failed to create post:", error);
-      alert("Error creating post.");
+      setAlert({
+        type: "error",
+        message: "Failed to create post. Please try again.",
+      });
     }
   };
 
@@ -194,7 +200,10 @@ export default function GroupView() {
   // --- Create Event ---
   const handleCreateEvent = async () => {
     if (!eventTitle.trim() || !eventDescription.trim() || !eventDateTime) {
-      return alert("All fields are required.");
+      return setAlert({
+        type: "error",
+        message: "Please fill in all fields.",
+      });
     }
 
     try {
@@ -226,8 +235,10 @@ export default function GroupView() {
       setEventDateTime("");
       setIsCreatingEvent(false);
     } catch (error) {
-      console.error("Failed to create event:", error);
-      alert("Error creating event.");
+      setAlert({
+        type: "error",
+        message: "Failed to create event. Please try again.",
+      });
     }
   };
 
@@ -256,8 +267,10 @@ export default function GroupView() {
         return [...prev, { event_id: eventId, user_id: "me", status }];
       });
     } catch (error) {
-      console.error("Failed to RSVP:", error);
-      alert("Error updating RSVP.");
+      setAlert({
+        type: "error",
+        message: "Failed to RSVP. Please try again.",
+      });
     }
   };
 
@@ -330,7 +343,17 @@ export default function GroupView() {
     );
 
   return (
-    <div className="min-h-screen bg-slate-50">
+   <>
+  {alert && (
+        <Alert
+          title={alert.type === "success" ? "Success" : "Error"}
+          message={alert.message}
+          type={alert.type}
+          duration={5000}
+          onClose={() => setAlert(null)}
+        />
+      )}
+<div className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Card className="border-none shadow-sm">
           <CardHeader className="bg-[#6C5CE7] text-white rounded-t-lg p-6">
@@ -497,5 +520,6 @@ export default function GroupView() {
         </Card>
       </div>
     </div>
+   </>
   );
 }

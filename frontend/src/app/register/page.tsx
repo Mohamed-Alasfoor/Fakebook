@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import Alert from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -19,8 +20,10 @@ import { PasswordInput } from "@/components/auth/password";
 import { LoginButtons } from "@/components/auth/login-buttons";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { set } from "date-fns";
 
 export default function RegisterPage() {
+  const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const router = useRouter();
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
@@ -81,15 +84,22 @@ export default function RegisterPage() {
       // Redirect to the home page after successful login
       router.push("/");
     } catch (err: any) {
-      console.error(err);
-      alert(
-        err.response?.data?.message || "An error occurred during registration."
-      );
+      setAlert({ type: "error", message: err.response.data });
     }
   };
 
   return (
-    <AuthLayout
+   <>
+   {alert && (
+        <Alert
+          title={alert.type === "success" ? "Success" : "Error"}
+          message={alert.message}
+          type={alert.type}
+          duration={5000}
+          onClose={() => setAlert(null)}
+        />
+      )}
+     <AuthLayout
       title="Create an Account 🚀"
       subtitle="Join our community and start sharing your moments"
     >
@@ -259,5 +269,6 @@ export default function RegisterPage() {
         </CardContent>
       </Card>
     </AuthLayout>
+   </>
   );
 }

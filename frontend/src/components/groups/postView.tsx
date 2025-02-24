@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { X } from "lucide-react";
+import Alert from "@/components/ui/alert";
+import { set } from "date-fns";
 
 interface Post {
   id: string;
@@ -34,7 +36,7 @@ export default function PostView({ post, onClose }: PostViewProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [isLoadingComments, setIsLoadingComments] = useState(true);
-
+  const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   // Fetch comments when the post is opened
   useEffect(() => {
     fetchComments();
@@ -56,7 +58,7 @@ export default function PostView({ post, onClose }: PostViewProps) {
   };
 
   const handleAddComment = async () => {
-    if (!newComment.trim()) return alert("Comment cannot be empty.");
+    if (!newComment.trim()) return setAlert({ type: "error", message: "Comment cannot be empty." });
 
     try {
       await axios.post(
@@ -69,12 +71,23 @@ export default function PostView({ post, onClose }: PostViewProps) {
       fetchComments(); // Re-fetch comments after posting
     } catch (error) {
       console.error("Failed to add comment:", error);
-      alert("Error adding comment.");
+      setAlert({ type: "error", message: "Failed to add comment. Please try again." });
     }
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+    <>
+    {alert && (
+        <Alert
+          title={alert.type === "success" ? "Success" : "Error"}
+          message={alert.message}
+          type={alert.type}
+          duration={5000}
+          onClose={() => setAlert(null)}
+        />
+      )}
+
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
       <div className="w-full max-w-3xl bg-white shadow-lg rounded-lg relative max-h-[90vh] overflow-y-auto flex flex-col">
         
         {/* Header with Close Button */}
@@ -157,5 +170,6 @@ export default function PostView({ post, onClose }: PostViewProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }
