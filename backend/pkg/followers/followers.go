@@ -114,7 +114,7 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 				db,
 				request.FollowedID,               // The user receiving the request
 				"follow_request",                 // Notification type
-				fmt.Sprintf("%s has requested to follow you.", followerNickname), // Use nickname here
+				fmt.Sprintf("%s has requested to follow you.", followerNickname),
 				"",                               // postID
 				userID,                           // relatedUserID (the follower)
 				"",                               // groupID
@@ -141,8 +141,8 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 			err = notifications.CreateNotification(
 				db,
 				request.FollowedID, // The user being followed
-				"follow",           // A custom type, e.g. "follow"
-				fmt.Sprintf("%s is now following you.", followerNickname), // Use nickname
+				"follow",           // Notification type for direct follows
+				fmt.Sprintf("%s is now following you.", followerNickname),
 				"",                 // postID
 				userID,             // relatedUserID (the follower)
 				"",                 // groupID
@@ -157,8 +157,6 @@ func FollowHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
-
 // UnfollowHandler handles requests to unfollow a user
 func UnfollowHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +165,7 @@ func UnfollowHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		//the logged-in user ID from session
+		// The logged-in user ID from session
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
@@ -183,7 +181,6 @@ func UnfollowHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Validate followed user ID
 		if request.FollowedID == "" {
 			http.Error(w, "Missing followed_id", http.StatusBadRequest)
 			return
@@ -205,7 +202,7 @@ func UnfollowHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		//Remove the follow relationship from the database
+		// Remove the follow relationship from the database
 		_, err = db.Exec(`
 			DELETE FROM followers
 			WHERE follower_id = ? AND followed_id = ?
@@ -219,11 +216,9 @@ func UnfollowHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
 // GetFollowersHandler fetches the followers (with details) for the logged-in user
 func GetFollowersHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Allow only GET requests
 		if r.Method != http.MethodGet {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
@@ -236,7 +231,7 @@ func GetFollowersHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Query to join followers with the users table for detailed info
+		// Join followers with users table to get follower details
 		rows, err := db.Query(`
 			SELECT users.id, users.nickname, users.avatar 
 			FROM followers 
@@ -249,7 +244,6 @@ func GetFollowersHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		// Create a slice to hold the follower details
 		var followers []struct {
 			ID       string `json:"id"`
 			Nickname string `json:"nickname"`
@@ -274,8 +268,6 @@ func GetFollowersHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
-
 // HandleFollowRequest allows the logged-in user to accept or decline follow requests
 func HandleFollowRequest(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +276,7 @@ func HandleFollowRequest(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Get the logged-in user ID from the session
+		// The logged-in user (the one receiving the follow request)
 		userID, err := sessions.GetUserIDFromSession(r)
 		if err != nil {
 			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
@@ -305,33 +297,67 @@ func HandleFollowRequest(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Invalid action, must be 'accept' or 'decline'", http.StatusBadRequest)
 			return
 		}
-		var action string;
+
+		var action string
 		if request.Action == "accept" {
 			action = "accepted"
 		} else {
 			action = "declined"
 		}
-		// Ensure the logged-in user is the one being followed (FollowedID)
+
+		// Update the follow request status
 		result, err := db.Exec(`UPDATE followers SET status = ? WHERE follower_id = ? AND followed_id = ? AND status = 'pending'`,
 			action, request.FollowerID, userID)
 		if err != nil {
 			http.Error(w, "Failed to update follow request", http.StatusInternalServerError)
 			return
 		}
-		result,err = db.Exec("DELETE FROM notifications WHERE user_id = ? AND related_user_id = ? AND type = 'follow_request'", userID, request.FollowerID)
+
+		rowsAffected, err := result.RowsAffected()
 		if err != nil {
-			http.Error(w, "Failed to delete notification", http.StatusInternalServerError)
+			http.Error(w, "Failed to determine affected rows", http.StatusInternalServerError)
 			return
 		}
-		rowsAffected, _ := result.RowsAffected()
 		if rowsAffected == 0 {
 			http.Error(w, "No pending follow request found", http.StatusNotFound)
 			return
 		}
 
+		// Remove the original follow_request notification
+		_, err = db.Exec("DELETE FROM notifications WHERE user_id = ? AND related_user_id = ? AND type = 'follow_request'", userID, request.FollowerID)
+		if err != nil {
+			http.Error(w, "Failed to delete follow request notification", http.StatusInternalServerError)
+			return
+		}
+
+		// Fetch the nickname of the logged-in user (the one accepting/declining)
+		var userNickname string
+		err = db.QueryRow(`SELECT nickname FROM users WHERE id = ?`, userID).Scan(&userNickname)
+		if err != nil {
+			log.Printf("Error fetching user nickname: %v", err)
+			http.Error(w, "Error fetching user nickname", http.StatusInternalServerError)
+			return
+		}
+
+		// Send a follow_response notification to the requester
+		err = notifications.CreateNotification(
+			db,
+			request.FollowerID, // The user who made the follow request
+			"follow_response",  // Notification type for the follow response
+			fmt.Sprintf("%s has %s your follow request.", userNickname, request.Action),
+			"",    // postID
+			userID, // relatedUserID: the responder
+			"",    // groupID
+			"",
+		)
+		if err != nil {
+			log.Println("Failed to create follow response notification:", err)
+		}
+
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(fmt.Sprintf("Follow request %s", request.Action)))
-	}}
+	}
+}
 
 // GetFollowRequestsHandler fetches pending follow requests for a user
 func GetFollowRequestsHandler(db *sql.DB) http.HandlerFunc {
@@ -348,7 +374,6 @@ func GetFollowRequestsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Fetch only requests for the logged-in user
 		rows, err := db.Query(`
 			SELECT follower_id FROM followers WHERE followed_id = ? AND status = 'pending'
 		`, userID)
@@ -372,5 +397,3 @@ func GetFollowRequestsHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(requests)
 	}
 }
-
-

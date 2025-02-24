@@ -12,7 +12,7 @@ interface Notification {
   type: string;
   content: string;
   post_id?: string;
-  related_user_id?: string;
+  related_user_id?: string; // For join requests, this is the requester’s ID.
   group_id?: string;
   event_id?: string;
   read: boolean;
@@ -70,13 +70,16 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     fetchNotifications();
   }, []);
 
-  // Handle marking a notification as read
+  // Mark a notification as read
   const markNotificationAsRead = async (notificationId: string) => {
     try {
-      const res = await fetch(`http://localhost:8080/notifications/read?id=${notificationId}`, {
-        method: "PUT",
-        credentials: "include",
-      });
+      const res = await fetch(
+        `http://localhost:8080/notifications/read?id=${notificationId}`,
+        {
+          method: "PUT",
+          credentials: "include",
+        }
+      );
       if (res.ok) {
         setNotifications((prev) =>
           prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
@@ -87,29 +90,55 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     }
   };
 
-  // Handle accepting or declining a follow request
-  const handleFollowRequest = async (notification: Notification, action: "accept" | "decline") => {
+  // Generic handler for group join requests and invites
+  const handleGroupRequest = async (
+    notification: Notification,
+    action: "accept" | "decline"
+  ) => {
+    let endpoint = "";
+    let payload: any = { action };
+
+    console.log("Handling group request for:", notification, "action:", action);
+
+    if (notification.type === "group_join_request") {
+      // Note: our server endpoint is registered as "/groups/join/respond"
+      endpoint = "http://localhost:8080/groups/join/respond";
+      payload.group_id = notification.group_id;
+      payload.user_id = notification.related_user_id; // requester’s ID
+    } else if (notification.type === "group_invite") {
+      // Note: our server endpoint is registered as "/groups/invite/respond"
+      endpoint = "http://localhost:8080/groups/invite/respond";
+      payload.group_id = notification.group_id;
+    } else {
+      console.error(
+        "Unknown notification type for group action:",
+        notification.type
+      );
+      return;
+    }
+
     try {
-      const res = await fetch("http://localhost:8080/follow/request", {
+      console.log("Sending request to:", endpoint, "with payload:", payload);
+      const res = await fetch(endpoint, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          follower_id: notification.related_user_id,
-          action: action,
-        }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
-        setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+        console.log("Group request handled successfully");
+        setNotifications((prev) =>
+          prev.filter((n) => n.id !== notification.id)
+        );
       } else {
-        console.error("Failed to handle follow request", res.status);
+        console.error("Failed to handle group request, status:", res.status);
       }
     } catch (error) {
-      console.error("Error handling follow request", error);
+      console.error("Error handling group request", error);
     }
   };
 
-  // Handle marking all notifications as read
+  // Mark all notifications as read
   const markAllAsRead = async () => {
     try {
       const res = await fetch("http://localhost:8080/notifications/read-all", {
@@ -141,7 +170,12 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           <Bell className="w-7 h-7" />
           <span className="text-2xl font-semibold">Notifications</span>
         </div>
-        <Button variant="ghost" size="icon" className="xl:hidden text-white" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="xl:hidden text-white"
+          onClick={onClose}
+        >
           <X className="w-7 h-7" />
         </Button>
       </div>
@@ -165,37 +199,52 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
                 <div className="flex items-center gap-4">
                   <Avatar className="w-10 h-10">
                     <AvatarImage src="/profile.png" alt="Notification Avatar" />
-                    <AvatarFallback>{notification.content.charAt(0)}</AvatarFallback>
+                    <AvatarFallback>
+                      {notification.content.charAt(0)}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <p className={`text-sm ${notification.read ? "opacity-80" : "font-semibold"}`}>
+                    <p
+                      className={`text-sm ${
+                        notification.read ? "opacity-80" : "font-semibold"
+                      }`}
+                    >
                       {notification.content}
                     </p>
-                    <span className="text-xs text-gray-200">{formatTime(notification.created_at)}</span>
+                    <span className="text-xs text-gray-200">
+                      {formatTime(notification.created_at)}
+                    </span>
                   </div>
                 </div>
 
-                {/* Follow Request Actions */}
-                {notification.type === "follow_request" && (
-                  <div className="flex gap-2 mt-2">
-                    <Button
-                      className="w-full border-green-400 text-green-400 hover:bg-green-500 hover:text-white flex items-center gap-1"
-                      variant="outline"
-                      onClick={() => handleFollowRequest(notification, "accept")}
-                    >
-                      <UserCheck className="w-4 h-4" />
-                      Accept
-                    </Button>
-                    <Button
-                      className="w-full border-red-400 text-red-400 hover:bg-red-500 hover:text-white flex items-center gap-1"
-                      variant="outline"
-                      onClick={() => handleFollowRequest(notification, "decline")}
-                    >
-                      <UserX className="w-4 h-4" />
-                      Decline
-                    </Button>
-                  </div>
-                )}
+                {/* Render buttons for actionable group notifications */}
+                {["group_join_request", "group_invite"].includes(
+                  notification.type
+                ) &&
+                  currentUserId === notification.user_id && (
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        className="w-full border-green-400 text-green-400 hover:bg-green-500 hover:text-white flex items-center gap-1"
+                        variant="outline"
+                        onClick={() =>
+                          handleGroupRequest(notification, "accept")
+                        }
+                      >
+                        <UserCheck className="w-4 h-4" />
+                        Accept
+                      </Button>
+                      <Button
+                        className="w-full border-red-400 text-red-400 hover:bg-red-500 hover:text-white flex items-center gap-1"
+                        variant="outline"
+                        onClick={() =>
+                          handleGroupRequest(notification, "decline")
+                        }
+                      >
+                        <UserX className="w-4 h-4" />
+                        Decline
+                      </Button>
+                    </div>
+                  )}
               </li>
             ))}
           </ul>
@@ -204,11 +253,14 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
 
       {/* Footer */}
       <div className="mt-6 pt-4 border-t border-white/20">
-        <Button variant="outline" className="w-full border-white/30 text-white bg-teal-500 hover:bg-teal-600" onClick={markAllAsRead}>
+        <Button
+          variant="outline"
+          className="w-full border-white/30 text-white bg-teal-500 hover:bg-teal-600"
+          onClick={markAllAsRead}
+        >
           Mark all as read
         </Button>
       </div>
     </div>
   );
 }
-
