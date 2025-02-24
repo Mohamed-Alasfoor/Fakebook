@@ -28,7 +28,7 @@ interface PostViewProps {
 export interface Comment {
   id: string; // Change id from number to string (UUID)
   user_id: string; // Ensure consistency with UUID format
-  userProfileImage?: string;
+  avatar?: string;
   nickname?: string;
   content: string;
   created_at: string;
@@ -73,8 +73,8 @@ export function PostView({
         content: c.content,
         created_at: c.created_at,
         image_url: c.image_url ? `${c.image_url}` : undefined,
-        userProfileImage: c.userProfileImage
-          ? `http://localhost:8080/uploads/${c.userProfileImage}`
+        avatar: c.avatar
+          ? `http://localhost:8080/avatars/${c.avatar}`
           : "/profile.png",
         nickname: c.nickname,
       }));

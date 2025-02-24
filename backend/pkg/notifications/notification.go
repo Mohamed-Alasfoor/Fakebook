@@ -1,4 +1,3 @@
-// File: pkg/notifications/notification.go
 package notifications
 
 import (
@@ -26,7 +25,6 @@ type Notification struct {
 	SenderAvatar   string `json:"sender_avatar,omitempty"`
 }
 
-
 // AddNotificationHandler adds a new notification
 func AddNotificationHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +51,7 @@ func AddNotificationHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// GetNotificationsHandler fetches notifications for a user
+// GetNotificationsHandler fetches notifications for a user (including sender's nickname and avatar)
 func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -66,11 +64,12 @@ func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Query to fetch notifications with sender's nickname and avatar
 		rows, err := db.Query(`
 			SELECT n.id, n.user_id, n.type, n.content, n.post_id, n.related_user_id, n.group_id, n.event_id, n.read, n.created_at,
 			       u.nickname, u.avatar
 			FROM notifications n
-			LEFT JOIN users u ON n.related_user_id = u.id
+			LEFT JOIN users u ON u.id = n.related_user_id
 			WHERE n.user_id = ?
 			ORDER BY n.created_at DESC
 		`, userID)
@@ -79,6 +78,7 @@ func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		defer rows.Close()
+
 		var notifications []Notification
 		for rows.Next() {
 			var notification Notification
@@ -105,7 +105,6 @@ func GetNotificationsHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(notifications)
 	}
 }
-
 
 // MarkNotificationReadHandler marks a single notification as read.
 func MarkNotificationReadHandler(db *sql.DB) http.HandlerFunc {

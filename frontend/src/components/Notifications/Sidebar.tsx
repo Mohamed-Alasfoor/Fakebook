@@ -12,11 +12,13 @@ interface Notification {
   type: string;
   content: string;
   post_id?: string;
-  related_user_id?: string; // For follow requests, this is the requester’s ID.
+  related_user_id?: string; // For follow requests, this is the requester's ID.
   group_id?: string;
   event_id?: string;
   read: boolean;
   created_at: string;
+  SenderNickname?: string;
+  sender_avatar?: string;
 }
 
 interface RightSidebarProps {
@@ -101,7 +103,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          follower_id: notification.related_user_id, // requester’s ID
+          follower_id: notification.related_user_id, // requester's ID
           action,
         }),
       });
@@ -118,7 +120,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     }
   };
 
-  // Generic handler for group join requests and invites remains unchanged
+  // Generic handler for group join requests and invites
   const handleGroupRequest = async (
     notification: Notification,
     action: "accept" | "decline"
@@ -129,7 +131,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     if (notification.type === "group_join_request") {
       endpoint = "http://localhost:8080/groups/join/respond";
       payload.group_id = notification.group_id;
-      payload.user_id = notification.related_user_id; // requester’s ID
+      payload.user_id = notification.related_user_id; // requester's ID
     } else if (notification.type === "group_invite") {
       endpoint = "http://localhost:8080/groups/invite/respond";
       payload.group_id = notification.group_id;
@@ -220,11 +222,17 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
               >
                 <div className="flex items-center gap-4">
                   <Avatar className="w-10 h-10">
-                    <AvatarImage src="/profile.png" alt="Notification Avatar" />
-                    <AvatarFallback>
-                      {notification.content.charAt(0)}
-                    </AvatarFallback>
+                    <AvatarImage
+                      src={
+                        notification.sender_avatar
+                          ? "http://localhost:8080/avatars/" +
+                            notification.sender_avatar
+                          : "/profile.png"
+                      }
+                      alt="Notification Avatar"
+                    />
                   </Avatar>
+
                   <div className="flex-1">
                     <p
                       className={`text-sm ${

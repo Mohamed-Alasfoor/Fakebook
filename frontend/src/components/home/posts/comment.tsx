@@ -19,17 +19,13 @@ interface Comment {
 export function CommentItem({ comment }: CommentItemProps) {
   console.log("Comment data:", comment);
   // Use comment.avatar if present, otherwise try comment.userProfileImage
-  const avatarSource = comment.avatar || comment.userProfileImage;
+  const avatarSource = comment.avatar;
 
   return (
     <div className="flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg shadow-sm w-full">
       <Avatar className="w-12 h-12 flex-shrink-0">
         <AvatarImage
-          src={
-            avatarSource
-              ? `http://localhost:8080/avatars/${avatarSource}`
-              : "/profile.png"
-          }
+          src={avatarSource ? `${avatarSource}` : "/profile.png"}
           alt={comment.nickname}
         />
         <AvatarFallback>{comment.nickname?.charAt(0)}</AvatarFallback>
