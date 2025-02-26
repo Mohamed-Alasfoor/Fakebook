@@ -32,17 +32,21 @@ export function MessageList({ currentUserId, userId }: MessageListProps) {
     fetchMessages()
   }, [userId])
 
-  // Filter socket messages relevant to the current conversation.
+  // Filter socket messages relevant to this conversation.
   const filteredSocketMessages = socketMessages.filter(
     (msg) =>
       (msg.sender_id === currentUserId && msg.receiver_id === userId) ||
       (msg.sender_id === userId && msg.receiver_id === currentUserId)
   )
 
-  // Merge history and socket messages, then sort by timestamp.
-  const mergedMessages = [...historyMessages, ...filteredSocketMessages].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  )
+  // ✅ Fix: Prevent duplicates by only adding WebSocket messages that are NOT in history
+  const messageMap = new Map(historyMessages.map((msg) => [msg.id, msg]))
+
+  const mergedMessages = [
+    ...historyMessages, 
+    ...filteredSocketMessages.filter((msg) => !messageMap.has(msg.id)) // Only add new messages
+  ]
+  .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -50,12 +54,12 @@ export function MessageList({ currentUserId, userId }: MessageListProps) {
 
   return (
     <ScrollArea className="flex-grow p-6">
-      {mergedMessages.length === 0 || mergedMessages===null ? (
+      {mergedMessages.length === 0 ? (
         <p className="text-center text-gray-400">No messages yet. Start the conversation!</p>
       ) : (
-        mergedMessages.map((message,i) => (
+        mergedMessages.map((message, i) => (
           <div
-            key={i}
+            key={message.id || i} // Use message ID if available
             className={`flex mb-4 ${
               message.sender_id === currentUserId ? "justify-end" : "justify-start"
             }`}
