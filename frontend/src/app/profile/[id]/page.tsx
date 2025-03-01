@@ -12,6 +12,7 @@ import { useState } from "react";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 export default function ProfilePage() {
   const params = useParams();
+  const [isRequested, setIsRequested] = useState(false);
   const userId = params?.id as string | undefined;
   const { user, isLoading, isError } = useUserProfile(userId);
   const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
@@ -30,6 +31,7 @@ export default function ProfilePage() {
           },
         }
       );
+      setIsRequested(true);
         setAlert({ type: "success", message: "User followed successfully" });
     } catch (error) {
         setAlert({ type: "error", message: "Failed to follow user" });
@@ -45,13 +47,20 @@ export default function ProfilePage() {
           <p className="text-gray-500 mt-2">
             You must follow <span className="font-medium">@{user.nickname}</span> to view their posts and details.
           </p>
-          {!user.is_my_profile && (
+          {!user.is_my_profile && user.pending==="0" && !isRequested && (
             <Button 
-              className="mt-4 bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white"
-              onClick={() => followRequest(user.id)}
-            >
-              Request to Follow
-            </Button>
+            className="mt-4 bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white"
+            onClick={() => followRequest(user.id)}
+          >
+            Request to Follow
+          </Button>
+          )}
+          {((!user.is_my_profile && user.pending==="1" )|| (!user.is_my_profile && isRequested )) && (
+            <Button 
+            className="mt-4 bg-[rgb(140,136,168)] hover:bg-[rgb(140,136,168)]/90 text-white cursor-not-allowed"
+          >
+            Requested
+          </Button>
           )}
         </div>
       </div>

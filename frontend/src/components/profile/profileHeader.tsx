@@ -5,6 +5,7 @@ import axios from "axios";
 import { CalendarIcon, UserIcon, UsersIcon, LockIcon } from "lucide-react";
 import Alert from "@/components/ui/alert";
 import { useEffect, useState } from "react";
+import Link from "next/link"
 
 interface ProfileHeaderProps {
   user: any;
@@ -115,9 +116,13 @@ export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps)
               </div>
             </div>
             {user.is_my_profile ? (
-              <Button variant="outline" className="mt-4">
+              <Link href="/settings">
+                <Button variant="outline" className="mt-4">
                 Edit Profile
               </Button>
+              </Link>
+
+
             ) : !user.is_following ? (
               <Button className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white" onClick={followUser}>
                 {user.private ? "Request to Follow" : "Follow"}

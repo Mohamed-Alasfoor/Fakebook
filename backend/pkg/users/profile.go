@@ -39,6 +39,7 @@ type UserProfile struct {
 	Followers      []User       `json:"followers"`  // New: list of followers
 	Following      []User       `json:"following"`  // New: list of following users
 	Posts          []posts.Post `json:"posts"`
+	Pending string         `json:"pending"`
 }
 
 // GetUserProfileHandler fetches profile info including follower and following details
@@ -92,6 +93,10 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 		// Fetch following count
 		db.QueryRow(`SELECT COUNT(*) FROM followers WHERE follower_id = ? AND status = 'accepted'`, profileID).Scan(&profile.FollowingCount)
 
+		//see if the user is pending to the private user	
+		db.QueryRow(`SELECT EXISTS(SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = ? AND status = 'pending')`, loggedInUserID, profileID).Scan(&profile.Pending)
+
+
 		// If the profile is private and the requester is NOT the owner or a follower, return limited info.
 		// (You could choose to restrict more information here.)
 		if profile.Private && !isMyProfile && !isFollowing {
@@ -105,6 +110,7 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 				IsFollowing bool   `json:"is_following"`
 				IsMyProfile bool   `json:"is_my_profile"`
 				Message     string `json:"message"`
+				Pending     string `json:"pending"`
 			}{
 				ID:          profile.ID,
 				Nickname:    profile.Nickname,
@@ -115,6 +121,7 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 				IsFollowing: isFollowing,
 				IsMyProfile: isMyProfile,
 				Message:     "This profile is private. You must follow to see more details.",
+				Pending:     profile.Pending,
 			}
 
 			w.Header().Set("Content-Type", "application/json")
