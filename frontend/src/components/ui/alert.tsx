@@ -67,7 +67,7 @@ const Alert: React.FC<AlertProps> = ({
           initial={{ opacity: 0, y: -50 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -50 }}
-          className="fixed top-4 right-4 z-50 max-w-md"
+          className="fixed top-4 right-4 z-[9999] max-w-md"
         >
           <motion.div
             initial={{ scale: 0.9 }}
@@ -80,7 +80,10 @@ const Alert: React.FC<AlertProps> = ({
                 {getIcon()}
                 <h2 className="text-xl font-semibold">{title}</h2>
               </div>
-              <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button
+                onClick={handleClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
                 <X size={24} />
               </button>
             </div>
@@ -93,4 +96,3 @@ const Alert: React.FC<AlertProps> = ({
 }
 
 export default Alert
-
