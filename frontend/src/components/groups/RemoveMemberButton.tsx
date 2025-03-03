@@ -47,26 +47,36 @@ export function RemoveMemberButton({ groupId, userId, onRemove }: RemoveMemberBu
         });
 
         if (onRemove) onRemove();
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error removing member:", error);
-
-        // If server says 403 => not the group creator
-        if (error.response?.status === 403) {
-          await MySwal.fire({
-            title: "Forbidden",
-            text: "Only the group creator can remove members.",
-            icon: "error",
-            confirmButtonColor: "#6C5CE7",
-          });
+      
+        if (axios.isAxiosError(error)) {
+          if (error.response?.status === 403) {
+            await MySwal.fire({
+              title: "Forbidden",
+              text: "Only the group creator can remove members.",
+              icon: "error",
+              confirmButtonColor: "#6C5CE7",
+            });
+          } else {
+            await MySwal.fire({
+              title: "Error",
+              text: error.response?.data || "Error removing member.",
+              icon: "error",
+              confirmButtonColor: "#6C5CE7",
+            });
+          }
         } else {
+          // Handle non-Axios errors
           await MySwal.fire({
-            title: "Error",
-            text: error.response?.data || "Error removing member.",
+            title: "Unexpected Error",
+            text: "An unexpected error occurred while removing the member.",
             icon: "error",
             confirmButtonColor: "#6C5CE7",
           });
         }
       }
+      
     }
   };
 

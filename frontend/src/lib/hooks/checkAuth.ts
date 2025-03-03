@@ -1,8 +1,9 @@
 import axios from "axios";
+import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
-export const checkAuth = async (setLoading: (loading: boolean) => void, router: any) => {
+export const checkAuth = async (setLoading: (loading: boolean) => void, router: AppRouterInstance) => {
       try {
-        const response = await axios.get("http://localhost:8080/posts/all", { // TODO : this is just a demo , when they craete api for auth replace it
+        const response = await axios.get("http://localhost:8080/posts/all", { 
           withCredentials: true,
         });
 
@@ -12,6 +13,7 @@ export const checkAuth = async (setLoading: (loading: boolean) => void, router: 
           router.push("/login"); // Redirect to login page
         }
       } catch (error) {
+        console.log(error);
         router.push("/login"); // Redirect to login on error
       }
     };

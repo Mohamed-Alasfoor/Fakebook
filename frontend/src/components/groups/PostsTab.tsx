@@ -36,7 +36,6 @@ export default function PostsTab({
   setIsCreatingPost,
   postContent,
   setPostContent,
-  postFile,
   setPostFile,
   handleCreatePost,
 }: PostsTabProps) {

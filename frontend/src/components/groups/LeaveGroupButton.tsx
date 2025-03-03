@@ -43,20 +43,29 @@ export function LeaveGroupButton({ groupId, onLeave }: LeaveGroupButtonProps) {
         });
 
         if (onLeave) onLeave();
-      } catch (error: any) {
-        console.error("Error leaving group:", error);
+      } catch (error: unknown) {
 
-        if (error.response?.status === 403) {
-          await MySwal.fire({
-            title: "Forbidden",
-            text: "You are the group creator. Please delete the group instead.",
-            icon: "error",
-            confirmButtonColor: "#6C5CE7",
-          });
+        if (axios.isAxiosError(error)) {
+          if (error.response?.status === 403) {
+            await MySwal.fire({
+              title: "Forbidden",
+              text: "You are the group creator. Please delete the group instead.",
+              icon: "error",
+              confirmButtonColor: "#6C5CE7",
+            });
+          } else {
+            await MySwal.fire({
+              title: "Error",
+              text: error.response?.data || "Error leaving group.",
+              icon: "error",
+              confirmButtonColor: "#6C5CE7",
+            });
+          }
         } else {
+          // Handle non-Axios errors gracefully
           await MySwal.fire({
-            title: "Error",
-            text: error.response?.data || "Error leaving group.",
+            title: "Unexpected Error",
+            text: "An unexpected error occurred while leaving the group.",
             icon: "error",
             confirmButtonColor: "#6C5CE7",
           });

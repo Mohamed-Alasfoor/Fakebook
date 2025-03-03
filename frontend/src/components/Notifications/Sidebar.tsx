@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Bell, X, UserCheck, UserX } from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import Cookies from "js-cookie";
 
 interface Notification {
@@ -130,7 +130,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
   ) => {
     e.stopPropagation();
     let endpoint = "";
-    let payload: any = { action };
+    const payload: Record<string, unknown> = { action };
 
     if (notification.type === "group_join_request") {
       endpoint = "http://localhost:8080/groups/join/respond";

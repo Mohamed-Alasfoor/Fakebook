@@ -14,7 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Alert from "@/components/ui/alert";
-import { set } from "date-fns";
 interface InviteButtonProps {
   groupId: string;
   // Optional callback to run after a successful invite (e.g. to refresh group data)
@@ -39,13 +38,15 @@ export function InviteButton({ groupId, onInviteSuccess }: InviteButtonProps) {
         { group_id: groupId, nickname },
         { withCredentials: true }
       );
+      console.log(response.data);
       setAlert({ type: "success", message: "Invite sent successfully!" });
       setNickname("");
       setOpen(false);
       if (onInviteSuccess) {
         onInviteSuccess();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      console.log("Error inviting member:", error);
       setAlert({ type: "error", message: "Failed to invite member. Please try again." });
     } finally {
       setLoading(false);

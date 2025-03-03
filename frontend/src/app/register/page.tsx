@@ -20,7 +20,6 @@ import { PasswordInput } from "@/components/auth/password";
 import { LoginButtons } from "@/components/auth/login-buttons";
 import axios from "axios";
 import { useRouter } from "next/navigation";
-import { set } from "date-fns";
 
 export default function RegisterPage() {
   const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
@@ -83,8 +82,12 @@ export default function RegisterPage() {
 
       // Redirect to the home page after successful login
       router.push("/");
-    } catch (err: any) {
-      setAlert({ type: "error", message: err.response.data });
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setAlert({ type: "error", message: err.response?.data || "An error occurred" });
+      } else {
+        setAlert({ type: "error", message: "An unexpected error occurred" });
+      }
     }
   };
 

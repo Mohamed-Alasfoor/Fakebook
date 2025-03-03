@@ -101,17 +101,19 @@ export default function SettingsPage() {
       setMessage("Profile updated successfully!");
       setMessageType("success");
       refreshUser();
-    } catch (err: any) {
-      if (
-        err.response &&
-        err.response.data &&
-        typeof err.response.data === "string" &&
-        err.response.data.includes("Nickname already taken")
-      ) {
-        setMessage("Nickname already taken. Please choose another.");
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const errorMessage = err.response?.data;
+        
+        if (typeof errorMessage === "string" && errorMessage.includes("Nickname already taken")) {
+          setMessage("Nickname already taken. Please choose another.");
+        } else {
+          setMessage("Error updating profile.");
+        }
       } else {
-        setMessage("Error updating profile.");
+        setMessage("An unexpected error occurred.");
       }
+  
       setMessageType("error");
     }
   };
@@ -130,8 +132,8 @@ export default function SettingsPage() {
       setMessage("Privacy setting updated!");
       setMessageType("success");
       refreshUser();
-    } catch (err: any) {
-      console.error(err);
+    } catch (err: unknown) {
+      console.log(err);
       setMessage("Error updating privacy setting.");
       setMessageType("error");
     }

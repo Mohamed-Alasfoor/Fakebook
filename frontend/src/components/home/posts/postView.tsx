@@ -5,8 +5,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { formatPostDate } from "@/lib/utils";
 import {
-  Heart,
-  MessageCircle,
+ 
   ArrowLeft,
   Send,
   Image as ImageIcon,
@@ -20,7 +19,7 @@ import Cookies from "js-cookie";
 interface PostViewProps {
   post: Post;
   onClose: () => void;
-  handleLike: (postId: number) => Promise<void>;
+  // handleLike: (postId: number) => Promise<void>;
   likesState: { [key: number]: boolean };
   likesCount: { [key: number]: number };
 }
@@ -38,13 +37,10 @@ export interface Comment {
 export function PostView({
   post,
   onClose,
-  handleLike,
-  likesState,
-  likesCount,
+  
 }: PostViewProps) {
   const { user, isLoading } = useUserProfile(Cookies.get("user_id"));
-  const hasLiked = likesState[post.id] ?? post.has_liked;
-  const currentLikesCount = likesCount[post.id] ?? post.likes_count;
+  
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -67,7 +63,7 @@ export function PostView({
         setComments([]);
         return;
       }
-      const loadedComments = response.data.map((c: any) => ({
+      const loadedComments = response.data.map((c: Comment) => ({
         id: c.id, // Keep UUID as a string
         user_id: c.user_id,
         content: c.content,
@@ -188,21 +184,7 @@ export function PostView({
         />
       )}
 
-      {/* Likes / Comments count
-      <div className="flex items-center gap-6 text-sm text-gray-500 mb-4">
-        <button
-          className={`flex items-center gap-2 ${
-            hasLiked ? "text-red-500" : "text-gray-500"
-          }`}
-          onClick={() => handleLike(post.id)}
-        >
-          <Heart className={`w-5 h-5 ${hasLiked ? "text-red-500" : ""}`} />
-          {currentLikesCount} Likes
-        </button>
-        <span className="flex items-center gap-2">
-          <MessageCircle className="w-5 h-5" /> {comments.length} Comments
-        </span>
-      </div> */}
+      
 
       <h3 className="text-lg font-semibold mt-4 mb-2">Comments</h3>
 

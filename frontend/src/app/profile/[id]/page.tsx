@@ -31,9 +31,11 @@ export default function ProfilePage() {
           },
         }
       );
+      console.log(response.data); 
       setIsRequested(true);
         setAlert({ type: "success", message: "User followed successfully" });
     } catch (error) {
+      console.log("Error following user:", error);
         setAlert({ type: "error", message: "Failed to follow user" });
     }
   };

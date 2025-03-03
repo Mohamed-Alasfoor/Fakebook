@@ -6,12 +6,13 @@ import { useLikes } from "@/lib/hooks/useLikes";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import PostItem from "@/components/home/posts/postItem";
 import { DeletePostButton } from "./DeletePostButton";
+import { Post } from "@/types/post";
 
 interface PostsListProps {
-  posts: any[];
+  posts: Post[];
   isLoading?: boolean;
   isError?: boolean;
-  onSelectPost: (post: any) => void;
+  onSelectPost: (post: Post) => void;
 }
 
 export default function PostsList({
@@ -20,29 +21,25 @@ export default function PostsList({
   isError,
   onSelectPost,
 }: PostsListProps) {
-  // (Optional) If you have "like" functionality
   const { likesState, likesCount, handleLike } = useLikes(posts || [], undefined);
 
-  // Identify the current user (from cookies)
   const currentUserId = Cookies.get("user_id");
 
-  // 1) Loading spinner
   if (isLoading) {
     return <LoadingSpinner size="large" />;
   }
 
-  // 2) Error state
+  
   if (isError) {
     return <div className="text-red-500">Error loading posts. Please try again later.</div>;
   }
 
-  // 3) Guard if posts is not an array
+  //  Guard if posts is not an array
   if (!Array.isArray(posts)) {
-    console.error("Error: posts is not an array", posts);
     return <div className="text-red-500">Something went wrong. Please try again.</div>;
   }
 
-  // 4) Render the posts
+  //  Render the posts
   return (
     <div className="space-y-4">
       {posts.map((post, index) => {
@@ -54,14 +51,13 @@ export default function PostsList({
             key={post.id || index}
             className="relative bg-white p-4 rounded-lg shadow"
           >
-            {/* If user is owner, display the "crazy trash icon" in top-right corner */}
+            {/*    if user is owner , display the trash icon in topright corner */}
             {post.user_id === currentUserId && (
               <div className="absolute top-2 right-2">
                 <DeletePostButton postId={post.id} />
               </div>
             )}
 
-            {/* Main content: e.g. title, text, image, likes, etc. */}
             <PostItem
               post={post}
               hasLiked={hasLiked}

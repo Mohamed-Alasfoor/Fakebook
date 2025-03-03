@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import Cookies from "js-cookie";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -40,7 +39,7 @@ export default function GroupView() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [rsvps, setRsvps] = useState<RSVPStatus[]>([]);
+  const [, setRsvps] = useState<RSVPStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
@@ -162,7 +161,7 @@ export default function GroupView() {
     } catch (error) {
       setAlert({
         type: "error",
-        message: "Failed to create post. Please try again.",
+        message: "Failed to create post. Please try again. "+error ,
       });
     }
   };
@@ -236,7 +235,7 @@ export default function GroupView() {
     } catch (error) {
       setAlert({
         type: "error",
-        message: "Failed to create event. Please try again.",
+        message: "Failed to create event. Please try again. "+error,
       });
     }
   };
@@ -268,7 +267,7 @@ export default function GroupView() {
     } catch (error) {
       setAlert({
         type: "error",
-        message: "Failed to RSVP. Please try again.",
+        message: "Failed to RSVP. Please try again. "+error,
       });
     }
   };

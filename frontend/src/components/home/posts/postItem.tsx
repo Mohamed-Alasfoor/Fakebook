@@ -2,15 +2,15 @@ import { Heart, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { formatPostDate } from "@/lib/utils";
+import { Post } from "@/types/post";
 
 interface PostItemProps {
-  post: any;
+  post: Post;
   hasLiked: boolean;
   likesCount: number;
   onLike: () => void;
   onSelectPost: () => void;
 }
-
 export default function PostItem({
   post,
   hasLiked,

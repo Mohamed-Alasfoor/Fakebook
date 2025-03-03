@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { X } from "lucide-react";
 import Alert from "@/components/ui/alert";
-import { set } from "date-fns";
 
 interface Post {
   id: string;

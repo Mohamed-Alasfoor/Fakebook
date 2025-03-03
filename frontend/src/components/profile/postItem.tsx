@@ -2,11 +2,19 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { HeartIcon, MessageCircleIcon } from "lucide-react";
+import { Post } from "@/types/post";
 
-export default function PostItem({ post }: any) {
+
+
+interface PostItemProps {
+  post: Post;
+}
+
+export default function PostItem({ post }: PostItemProps) {
   return (
     <Card className="mb-6">
       <CardHeader className="flex flex-row items-center gap-4">
+        <h1>ddddddddddd</h1>
         <Avatar>
           <AvatarImage
             src={
@@ -16,7 +24,7 @@ export default function PostItem({ post }: any) {
             }
             alt={post.nickname}
           />
-          <AvatarFallback>{post.nickname[0]}</AvatarFallback>
+          <AvatarFallback>{post.nickname}</AvatarFallback>
         </Avatar>
         <div>
           <h3 className="text-lg font-semibold">{post.nickname}</h3>

@@ -12,4 +12,5 @@ export interface User {
   name: string;
   online: boolean;
   avatar: string;
+  nickname?: string;  
 }

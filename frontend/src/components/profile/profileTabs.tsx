@@ -1,5 +1,4 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import PostItem from "@/components/home/posts/postItem";
 import FollowerItem from "@/components/profile/followerItem";
 import FollowingItem from "@/components/profile/followingItem";
 import PostsList from "../home/posts/postList";
@@ -7,8 +6,32 @@ import { useState } from "react";
 import { Post } from "@/types/post";
 import { PostView } from "@/components/home/posts/postView";
 
-export default function ProfileTabs({ user }: any) {
+interface Follower {
+  id: string;
+  nickname: string;
+  avatar?: string; // Can be undefined
+}
+
+interface Following {
+  id: string;
+  nickname: string;
+  avatar?: string; // Can be undefined
+}
+
+interface User {
+  id: string;
+  posts: Post[] | null;
+  followers: Follower[] | null;
+  following: Following[] | null;
+}
+
+interface ProfileTabsProps {
+  user: User;
+}
+
+export default function ProfileTabs({ user }: ProfileTabsProps) {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+
   return (
     <Tabs defaultValue="posts">
       <TabsList className="w-full justify-start mb-6">
@@ -18,14 +41,11 @@ export default function ProfileTabs({ user }: any) {
       </TabsList>
 
       <TabsContent value="posts">
-        {user.posts !==null ? (
+        {user.posts !== null && user.posts.length > 0 ? (
           selectedPost ? (
             <PostView
               post={selectedPost}
               onClose={() => setSelectedPost(null)}
-              handleLike={async (postId: number) => {
-                throw new Error("Function not implemented.");
-              }}
               likesState={{}}
               likesCount={{}}
             />
@@ -38,16 +58,19 @@ export default function ProfileTabs({ user }: any) {
       </TabsContent>
 
       <TabsContent value="followers">
-        {user.followers !==null? (
+        {user.followers !== null && user.followers.length > 0 ? (
           user.followers
             .filter(
-              (follower: any, index: number, self: any[]) =>
+              (follower, index, self) =>
                 self.findIndex((f) => f.id === follower.id) === index
             )
-            .map((follower: any, index: number) => (
+            .map((follower, index) => (
               <FollowerItem
                 key={`${follower.id}-${index}`}
-                follower={follower}
+                follower={{
+                  ...follower,
+                  avatar: follower.avatar ?? "/profile.png", // Ensure avatar is always a string
+                }}
               />
             ))
         ) : (
@@ -56,16 +79,19 @@ export default function ProfileTabs({ user }: any) {
       </TabsContent>
 
       <TabsContent value="following">
-        {user.following && user.following !==null ? (
+        {user.following !== null && user.following.length > 0 ? (
           user.following
             .filter(
-              (following: any, index: number, self: any[]) =>
+              (following, index, self) =>
                 self.findIndex((f) => f.id === following.id) === index
             )
-            .map((following: any, index: number) => (
+            .map((following, index) => (
               <FollowingItem
                 key={`${following.id}-${index}`}
-                following={following}
+                following={{
+                  ...following,
+                  avatar: following.avatar ?? "/profile.png", // Ensure avatar is always a string
+                }}
               />
             ))
         ) : (

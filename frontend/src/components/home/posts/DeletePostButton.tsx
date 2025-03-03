@@ -41,7 +41,7 @@ export function DeletePostButton({ postId }: DeletePostButtonProps) {
 
         window.location.reload();
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error deleting post:", err);
         MySwal.fire("Error", "Could not delete post.", "error");
       }

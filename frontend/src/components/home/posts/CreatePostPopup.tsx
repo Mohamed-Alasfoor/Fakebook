@@ -17,17 +17,28 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { X, Image, Globe, Lock, Users, User } from "lucide-react";
-import axios from "axios";
+import {  Image, Globe, Lock, Users, User } from "lucide-react";
 import { useFollowers } from "@/lib/hooks/swr/useFollowers";
 import Cookies from "js-cookie";
 import Alert from "@/components/ui/alert";
-import { set } from "date-fns";
 
 interface CreatePostPopupProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreatePost: (post: any) => void;
+  onCreatePost: (post: Post[]) => void;
+}
+interface Follower {
+  id: string;
+  nickname: string;
+}
+
+// Define a type for a post
+interface Post {
+  id: string;
+  content: string;
+  privacy: string;
+  imageUrl?: string;
+  createdAt: string;
 }
 
 export function CreatePostPopup({
@@ -97,9 +108,8 @@ export function CreatePostPopup({
       const result = await response.json();
       setAlert({ type: "success", message: "Post created successfully!" });
 
-      onCreatePost((prevPosts: any[]) =>
-        Array.isArray(prevPosts) ? [result, ...prevPosts] : [result]
-      );
+      
+      onCreatePost([result]);
 
       // Reset form
       setContent("");
@@ -205,7 +215,7 @@ export function CreatePostPopup({
               ) : (
                 <div className="max-h-60 overflow-y-auto border p-2 rounded space-y-2">
                   {followers && followers.length > 0 ? (
-                    followers.map((follower: any) => (
+                    followers.map((follower: Follower) => (
                       <div key={follower.id} className="flex items-center">
                         <input
                           type="checkbox"

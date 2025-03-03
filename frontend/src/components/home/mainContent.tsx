@@ -86,7 +86,7 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
                 {searchResults.groups?.map((group: any) => (
                   <li key={group.id} className="p-2 border-b">
                     <Link
-                      href={`/groups/${group.id}`}
+                      href={`/groups#${group.id}`}
                       className="flex items-center gap-4 hover:bg-gray-100 p-2"
                     >
                       <span className="text-base font-medium">

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users } from "lucide-react";
 import Link from "next/link";
+import { useEffect } from "react";
 
 interface Group {
   id: string;
@@ -23,6 +24,39 @@ interface GroupListProps {
 }
 
 export function GroupList({ groups, type, isLoading, refreshGroups, requestToJoin, enterGroupChat }: GroupListProps) {
+  useEffect(() => {
+    const scrollToHash = () => {
+        const hash = window.location.hash.substring(1);
+        if (hash) {
+            setTimeout(() => {
+                const element = document.getElementById(hash);
+                if (element) {
+                    // Scroll smoothly to the element
+                    element.scrollIntoView({ behavior: "smooth", block: "center" });
+
+                    // Add Tailwind classes for highlighting
+                    element.classList.add("bg-purple-100", "shadow-lg", "scale-105", "transition-all", "duration-500");
+
+                    // Remove the highlight effect after 2 seconds
+                    setTimeout(() => {
+                        element.classList.remove("bg-purple-100", "shadow-lg", "scale-105");
+                    }, 2000);
+                }
+            }, 500); // Small delay to ensure element is rendered before scrolling
+        }
+    };
+
+    scrollToHash(); // Run on mount
+    window.addEventListener("hashchange", scrollToHash); // Run when hash changes
+
+    return () => {
+        window.removeEventListener("hashchange", scrollToHash);
+    };
+}, []);
+
+  
+  
+  
   if (isLoading) {
     return (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -58,11 +92,19 @@ export function GroupList({ groups, type, isLoading, refreshGroups, requestToJoi
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {groups.map((group) => (
-        <Card key={group.id} className="border-2 border-slate-100 hover:border-[#6C5CE7] transition-colors">
+        <Card key={group.id} className="border-2 border-slate-100 hover:border-[#6C5CE7] transition-colors" id={group.id}>
           <CardHeader>
-            <Link href={`/groups/${group.id}`}>
-              <CardTitle className="text-[#6C5CE7] hover:underline cursor-pointer">{group.name}</CardTitle>
-            </Link>
+            {
+              type==="discover" ? (
+              
+               <CardTitle className="text-[#6C5CE7] hover:underline cursor-pointer">{group.name}</CardTitle>
+              
+            ):(
+              <Link href={`/groups/${group.id}`}>
+               <CardTitle className="text-[#6C5CE7] hover:underline cursor-pointer">{group.name}</CardTitle>
+              </Link>
+              )
+            }
             <CardDescription>Created on {new Date(group.created_at).toLocaleDateString()}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

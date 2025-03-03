@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { Github, Twitter } from "lucide-react"
+import { Github } from "lucide-react"
 
 export function LoginButtons() {
   return (

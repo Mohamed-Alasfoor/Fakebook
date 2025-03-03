@@ -8,9 +8,10 @@ import { CreateGroupDialog } from "@/components/groups/create-group-dialog";
 import { GroupList } from "@/components/groups/group-list";
 import { useGroups } from "@/lib/hooks/use-groups";
 import axios from "axios";
+import { Group } from "@/types/groupTypes";
 
 export default function GroupsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery,] = useState("");
   const { groups, joinedGroups, isLoading, searchGroups, refreshGroups } = useGroups();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -60,7 +61,7 @@ export default function GroupsPage() {
 
           <TabsContent value="discover">
             <GroupList
-              groups={groups as any[]}
+              groups={groups as Group[]}
               type="discover"
               isLoading={isLoading}
               refreshGroups={refreshGroups}
@@ -71,7 +72,7 @@ export default function GroupsPage() {
 
           <TabsContent value="joined">
             <GroupList
-              groups={joinedGroups as any[]}
+              groups={joinedGroups as Group[]}
               type="joined"
               isLoading={isLoading}
               refreshGroups={refreshGroups}

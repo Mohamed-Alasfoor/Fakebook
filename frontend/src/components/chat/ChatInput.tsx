@@ -22,6 +22,7 @@ export function ChatInput({ currentUserId, userId }: ChatInputProps) {
       receiver_id: userId,
       message: message,
       type: "message",
+      sender_name: "",
     })
 
     setMessage("")

@@ -35,7 +35,7 @@ export default function ChatPage() {
             typeof event.data === "string" ? event.data.trim() : "";
           if (trimmedData.startsWith("{") || trimmedData.startsWith("[")) {
             const receivedUsers = JSON.parse(trimmedData);
-            const formattedUsers: User[] = receivedUsers.map((user: any) => ({
+            const formattedUsers: User[] = receivedUsers.map((user: User) => ({
               id: user.id,
               name: user.nickname || "Unknown User",
               avatar: user.avatar

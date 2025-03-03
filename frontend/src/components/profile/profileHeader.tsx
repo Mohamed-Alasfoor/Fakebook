@@ -4,15 +4,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import axios from "axios";
 import { CalendarIcon, UserIcon, UsersIcon, LockIcon } from "lucide-react";
 import Alert from "@/components/ui/alert";
-import { useEffect, useState } from "react";
-import Link from "next/link"
+import { useState } from "react";
+import Link from "next/link";
+import { User } from "@/types/user";
+
+
 
 interface ProfileHeaderProps {
-  user: any;
+  user: User;
 }
 
 export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps) {
-  const [user, setUser] = useState(initialUser);
+  const [user, setUser] = useState<User>(initialUser);
   const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
 
   const formatDate = (dateString: string) => {
@@ -44,8 +47,9 @@ export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps)
       );
       setAlert({ type: "success", message: "User followed successfully!" });
       refreshProfile(); // Fetch updated user data
-      location.reload()
+      location.reload();
     } catch (error) {
+      console.log(error);
       setAlert({ type: "error", message: "Error following user" });
     }
   };
@@ -58,9 +62,10 @@ export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps)
         headers: { "Content-Type": "application/json" },
       });
       setAlert({ type: "success", message: "User unfollowed successfully!" });
-      location.reload()
+      location.reload();
       refreshProfile(); // Fetch updated user data
     } catch (error) {
+      console.log(error);
       setAlert({ type: "error", message: "Error unfollowing user" });
     }
   };
@@ -118,11 +123,9 @@ export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps)
             {user.is_my_profile ? (
               <Link href="/settings">
                 <Button variant="outline" className="mt-4">
-                Edit Profile
-              </Button>
+                  Edit Profile
+                </Button>
               </Link>
-
-
             ) : !user.is_following ? (
               <Button className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white" onClick={followUser}>
                 {user.private ? "Request to Follow" : "Follow"}

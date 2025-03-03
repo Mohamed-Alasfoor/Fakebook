@@ -3,14 +3,14 @@ import axios from "axios";
 import { Post } from "@/types/post";
 
 interface UseLikesReturn {
-  likesState: { [key: number]: boolean };
-  likesCount: { [key: number]: number };
-  handleLike: (postId: number) => Promise<void>;
+  likesState: { [key: string]: boolean };
+  likesCount: { [key: string]: number };
+  handleLike: (postId: string) => Promise<void>; 
 }
 
 export function useLikes(initialPosts: Post[], refreshPosts?: () => void): UseLikesReturn {
-  const [likesState, setLikesState] = useState<{ [key: number]: boolean }>({});
-  const [likesCount, setLikesCount] = useState<{ [key: number]: number }>({});
+  const [likesState, setLikesState] = useState<{ [key: string]: boolean }>({});
+  const [likesCount, setLikesCount] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
     if (initialPosts.length > 0) {
@@ -19,8 +19,9 @@ export function useLikes(initialPosts: Post[], refreshPosts?: () => void): UseLi
         let hasChanged = false;
 
         initialPosts.forEach((post) => {
-          if (newState[post.id] !== post.has_liked) {
-            newState[post.id] = post.has_liked;
+          const postId = String(post.id); 
+          if (newState[postId] !== post.has_liked) {
+            newState[postId] = post.has_liked;
             hasChanged = true;
           }
         });
@@ -33,8 +34,9 @@ export function useLikes(initialPosts: Post[], refreshPosts?: () => void): UseLi
         let hasChanged = false;
 
         initialPosts.forEach((post) => {
-          if (newCount[post.id] !== post.likes_count) {
-            newCount[post.id] = post.likes_count;
+          const postId = String(post.id); // Convert post.id to string
+          if (newCount[postId] !== post.likes_count) {
+            newCount[postId] = post.likes_count;
             hasChanged = true;
           }
         });
@@ -42,10 +44,10 @@ export function useLikes(initialPosts: Post[], refreshPosts?: () => void): UseLi
         return hasChanged ? newCount : prev;
       });
     }
-  }, [initialPosts]); 
+  }, [initialPosts]);
 
-  //  Handle like/unlike requests
-  const handleLike = async (postId: number) => {
+  // Handle like/unlike requests
+  const handleLike = async (postId: string) => { // Ensure postId is a string
     try {
       const isLiked = likesState[postId] ?? false;
 
@@ -70,7 +72,7 @@ export function useLikes(initialPosts: Post[], refreshPosts?: () => void): UseLi
         });
       }
 
-      //  Refresh posts only when needed
+      // Refresh posts only when needed
       if (refreshPosts) refreshPosts();
     } catch (error) {
       console.error("Error toggling like:", error);

@@ -21,6 +21,7 @@ export default function LoginPage() {
       e.preventDefault();
       try {
           const res = await axios.post('http://localhost:8080/login', { identifier, password });
+          console.log(res.data);
           router.push('/');
       } catch (err) {
           if (axios.isAxiosError(err) && err.response) {
@@ -81,7 +82,7 @@ export default function LoginPage() {
         <LoginButtons />
 
         <p className="text-center text-sm text-gray-600">
-          Don't have an account?{" "}
+          Dont have an account?{" "}
           <Link href="/register" className="text-[#6C5CE7] hover:underline font-medium">
             Sign up
           </Link>
