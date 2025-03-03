@@ -93,12 +93,10 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 		// Fetch following count
 		db.QueryRow(`SELECT COUNT(*) FROM followers WHERE follower_id = ? AND status = 'accepted'`, profileID).Scan(&profile.FollowingCount)
 
-		//see if the user is pending to the private user	
+		// Check if the user has a pending follow request
 		db.QueryRow(`SELECT EXISTS(SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = ? AND status = 'pending')`, loggedInUserID, profileID).Scan(&profile.Pending)
 
-
 		// If the profile is private and the requester is NOT the owner or a follower, return limited info.
-		// (You could choose to restrict more information here.)
 		if profile.Private && !isMyProfile && !isFollowing {
 			response := struct {
 				ID          string `json:"id"`
@@ -161,41 +159,36 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Fetch user posts.
-		// Now, if the viewer is not the owner and not following, fetch only public posts.
-		var query string
+		// Fetch user posts with proper privacy filtering
 		var postRows *sql.Rows
+		query := `
+			SELECT posts.id, posts.user_id, posts.content, posts.image_url, posts.privacy, posts.likes_count, 
+			       posts.comments_count, posts.created_at, users.nickname, users.avatar,
+			       EXISTS(SELECT 1 FROM likes WHERE likes.post_id = posts.id AND likes.user_id = ?) AS has_liked
+			FROM posts
+			INNER JOIN users ON posts.user_id = users.id
+			WHERE posts.user_id = ?
+			AND (
+				posts.privacy = 'public'
+				OR (posts.privacy = 'almost-private' AND (posts.user_id = ? OR EXISTS(
+					SELECT 1 FROM followers WHERE follower_id = ? AND followed_id = posts.user_id AND status = 'accepted'
+				)))
+				OR (posts.privacy = 'private' AND (posts.user_id = ? OR EXISTS(
+					SELECT 1 FROM post_privacy WHERE post_id = posts.id AND user_id = ?
+				)))
+			)
+			ORDER BY posts.created_at DESC;
+		`
 
-		if !isMyProfile && !isFollowing {
-			query = `
-				SELECT id, user_id, content, image_url, privacy, likes_count, comments_count, created_at, 
-					(SELECT nickname FROM users WHERE id = user_id) AS nickname, 
-					(SELECT avatar FROM users WHERE id = user_id) AS avatar,
-					EXISTS(SELECT 1 FROM likes WHERE likes.post_id = posts.id AND likes.user_id = ?) AS has_liked
-				FROM posts 
-				WHERE user_id = ? 
-				  AND privacy = 'public'
-				ORDER BY created_at DESC`
-			postRows, err = db.Query(query, loggedInUserID, profileID)
-		} else {
-			query = `
-				SELECT id, user_id, content, image_url, privacy, likes_count, comments_count, created_at, 
-					(SELECT nickname FROM users WHERE id = user_id) AS nickname, 
-					(SELECT avatar FROM users WHERE id = user_id) AS avatar,
-					EXISTS(SELECT 1 FROM likes WHERE likes.post_id = posts.id AND likes.user_id = ?) AS has_liked
-				FROM posts 
-				WHERE user_id = ? 
-				ORDER BY created_at DESC`
-			postRows, err = db.Query(query, loggedInUserID, profileID)
-		}
-
+		// Pass userID multiple times as required in the query
+		postRows, err = db.Query(query, loggedInUserID, profileID, loggedInUserID, loggedInUserID, loggedInUserID, loggedInUserID)
 		if err != nil {
 			http.Error(w, "Failed to fetch posts", http.StatusInternalServerError)
 			return
 		}
 		defer postRows.Close()
 
-		postCount := 0
+		// Parse fetched posts
 		for postRows.Next() {
 			var post posts.Post
 			if err := postRows.Scan(
@@ -206,7 +199,6 @@ func GetUserProfileHandler(db *sql.DB) http.HandlerFunc {
 				return
 			}
 			profile.Posts = append(profile.Posts, post)
-			postCount++
 		}
 
 		// Include isFollowing and isMyProfile in all responses
