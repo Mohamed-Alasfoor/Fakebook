@@ -7,12 +7,13 @@ services:
       - "8080:8080"
     environment:
       - DATABASE_URL=your_database_url
+      - MIGRATIONS_PATH=file:///app/db/migrations
     networks:
       - social-network
 
   frontend:
     build:
-      context: ./frontend # <-- Updated to point to the correct folder
+      context: ./frontend
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
