@@ -1,26 +1,28 @@
-version: "3.8"
-
 services:
   backend:
-    build: ./backend
-    container_name: backend-container
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
+    environment:
+      - DATABASE_URL=your_database_url
     networks:
-      - my-network
-    restart: always
+      - social-network
 
   frontend:
-    build: ./frontend
-    container_name: frontend-container
+    build:
+      context: ./frontend # <-- Updated to point to the correct folder
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    networks:
-      - my-network
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8080
     depends_on:
       - backend
-    restart: always
+    networks:
+      - social-network
 
 networks:
-  my-network:
+  social-network:
     driver: bridge

@@ -4,10 +4,10 @@ import (
 	"database/sql"
 	"log"
 
-	_ "modernc.org/sqlite" // Register SQLite driver
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file" // File-based migrations
+	_ "modernc.org/sqlite"                               // Register SQLite driver
 )
 
 // ConnectDB initializes and returns a SQLite database connection with proper settings.
@@ -52,7 +52,7 @@ func ApplyMigrations(db *sql.DB) {
 
 	// Use the correct driver name "sqlite" instead of "sqlite3"
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://app/db/migrations",
+		"file:///app/db/migrations",
 		"sqlite", // Correct driver name for migrate
 		driver,
 	)

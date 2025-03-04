@@ -4,13 +4,7 @@ import { Post } from "@/types/post";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { formatPostDate } from "@/lib/utils";
-import {
- 
-  ArrowLeft,
-  Send,
-  Image as ImageIcon,
-  XCircle,
-} from "lucide-react";
+import { ArrowLeft, Send, Image as ImageIcon, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { CommentItem } from "@/components/home/posts/comment";
 import { useUserProfile } from "@/lib/hooks/swr/getUserProfile";
@@ -19,7 +13,7 @@ import Cookies from "js-cookie";
 interface PostViewProps {
   post: Post;
   onClose: () => void;
-  // handleLike: (postId: number) => Promise<void>;
+  handleLike?: (postId: number) => Promise<void>; // Make it optional
   likesState: { [key: number]: boolean };
   likesCount: { [key: number]: number };
 }
@@ -34,13 +28,8 @@ export interface Comment {
   image_url?: string;
 }
 
-export function PostView({
-  post,
-  onClose,
-  
-}: PostViewProps) {
+export function PostView({ post, onClose }: PostViewProps) {
   const { user, isLoading } = useUserProfile(Cookies.get("user_id"));
-  
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -183,8 +172,6 @@ export function PostView({
           className="w-full rounded-lg mb-4"
         />
       )}
-
-      
 
       <h3 className="text-lg font-semibold mt-4 mb-2">Comments</h3>
 

@@ -9,6 +9,8 @@ import { PostView } from "@/components/home/posts/postView";
 import { usePosts } from "@/lib/hooks/swr/getPosts";
 import { Post } from "@/types/post";
 import { useSearch } from "@/lib/hooks/useSearch";
+import { User } from "@/types/user";
+import { Group } from "@/types/groupTypes";
 
 interface MainContentProps {
   onOpenSidebar: () => void;
@@ -67,7 +69,7 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
             <>
               <h3 className="font-bold mt-4">Users</h3>
               <ul>
-                {searchResults.users?.map((user: any) => (
+                {searchResults.users?.map((user: User) => (
                   <li key={user.id} className="p-2 border-b">
                     <Link
                       href={`/profile/${user.id}`}
@@ -83,7 +85,7 @@ export function MainContent({ onOpenSidebar }: MainContentProps) {
 
               <h3 className="font-bold mt-4">Groups</h3>
               <ul>
-                {searchResults.groups?.map((group: any) => (
+                {searchResults.groups?.map((group: Group) => (
                   <li key={group.id} className="p-2 border-b">
                     <Link
                       href={`/groups#${group.id}`}
