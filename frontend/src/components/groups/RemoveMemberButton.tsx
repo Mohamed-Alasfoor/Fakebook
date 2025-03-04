@@ -8,13 +8,17 @@ import withReactContent from "sweetalert2-react-content";
 
 interface RemoveMemberButtonProps {
   groupId: string;
-  userId: string;       // The ID of the member to remove
-  onRemove?: () => void // Optional callback for updating local state
+  userId: string; // The ID of the member to remove
+  onRemove?: () => void; // Optional callback for updating local state
 }
 
 const MySwal = withReactContent(Swal);
 
-export function RemoveMemberButton({ groupId, userId, onRemove }: RemoveMemberButtonProps) {
+export function RemoveMemberButton({
+  groupId,
+  userId,
+  onRemove,
+}: RemoveMemberButtonProps) {
   const handleRemove = async () => {
     const result = await MySwal.fire({
       title: "Remove Member?",
@@ -30,13 +34,16 @@ export function RemoveMemberButton({ groupId, userId, onRemove }: RemoveMemberBu
     if (result.isConfirmed) {
       try {
         // Make a DELETE request with { group_id, user_id } in the body
-        const response = await axios.delete("http://localhost:8080/groups/remove", {
-          data: {
-            group_id: groupId,
-            user_id: userId,
-          },
-          withCredentials: true,
-        });
+        const response = await axios.delete(
+          "http://localhost:8080/groups/remove",
+          {
+            data: {
+              group_id: groupId,
+              user_id: userId,
+            },
+            withCredentials: true,
+          }
+        );
 
         // Success alert
         await MySwal.fire({
@@ -48,8 +55,8 @@ export function RemoveMemberButton({ groupId, userId, onRemove }: RemoveMemberBu
 
         if (onRemove) onRemove();
       } catch (error: unknown) {
-        console.error("Error removing member:", error);
-      
+        console.log("Error removing member:", error);
+
         if (axios.isAxiosError(error)) {
           if (error.response?.status === 403) {
             await MySwal.fire({
@@ -76,7 +83,6 @@ export function RemoveMemberButton({ groupId, userId, onRemove }: RemoveMemberBu
           });
         }
       }
-      
     }
   };
 

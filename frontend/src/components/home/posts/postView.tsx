@@ -66,7 +66,7 @@ export function PostView({ post, onClose }: PostViewProps) {
 
       setComments(loadedComments);
     } catch (err) {
-      console.error("Error fetching comments:", err);
+      console.log("Error fetching comments:", err);
       setError("Failed to load comments.");
     } finally {
       setLoading(false);
@@ -122,7 +122,7 @@ export function PostView({ post, onClose }: PostViewProps) {
         throw new Error("Server did not return a successful response.");
       }
     } catch (err) {
-      console.error("Error adding comment:", err);
+      console.log("Error adding comment:", err);
       setError("Failed to post comment. Please try again.");
     } finally {
       setSubmitting(false);

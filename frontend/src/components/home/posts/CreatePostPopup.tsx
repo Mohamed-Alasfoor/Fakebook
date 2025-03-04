@@ -17,7 +17,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {  Image, Globe, Lock, Users, User } from "lucide-react";
+import { Image, Globe, Lock, Users, User } from "lucide-react";
 import { useFollowers } from "@/lib/hooks/swr/useFollowers";
 import Cookies from "js-cookie";
 import Alert from "@/components/ui/alert";
@@ -51,7 +51,10 @@ export function CreatePostPopup({
   const [privacy, setPrivacy] = useState("public");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [error, setError] = useState("");
-  const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+  const [alert, setAlert] = useState<{
+    type: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
   const maxChars = 500; // Maximum allowed characters
 
   // Get logged-in user's ID from cookies and fetch real followers
@@ -108,7 +111,6 @@ export function CreatePostPopup({
       const result = await response.json();
       setAlert({ type: "success", message: "Post created successfully!" });
 
-      
       onCreatePost([result]);
 
       // Reset form
@@ -118,14 +120,14 @@ export function CreatePostPopup({
       setImage(null);
       onClose();
     } catch (error) {
-      console.error("Error creating post:", error);
+      console.log("Error creating post:", error);
       setAlert({ type: "error", message: "Failed to create post." });
     }
   };
 
   return (
-   <>
-    {alert && (
+    <>
+      {alert && (
         <Alert
           title={alert.type === "success" ? "Success" : "Error"}
           message={alert.message}
@@ -134,135 +136,135 @@ export function CreatePostPopup({
           onClose={() => setAlert(null)}
         />
       )}
-     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[550px]">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">
-            Create New Post
-          </DialogTitle>
-        </DialogHeader>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">
+              Create New Post
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="grid gap-6 py-4">
-          <Textarea
-            placeholder="What's on your mind?"
-            value={content}
-            onChange={handleContentChange}
-            className="min-h-[180px] text-lg"
-          />
-          {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
-          <p className="text-sm text-gray-500">
-            Character count: {content.length}/{maxChars}
-          </p>
-
-          {/* Image Upload */}
-          <div className="flex items-center gap-4">
-            <Label
-              htmlFor="image-upload"
-              className="cursor-pointer flex items-center gap-2 text-[#6C5CE7] hover:text-[#6C5CE7]/80"
-            >
-              <Image className="h-6 w-6" />
-              <span className="text-base font-medium">
-                {image ? "Change Image" : "Add Image"}
-              </span>
-            </Label>
-            <Input
-              id="image-upload"
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="hidden"
+          <div className="grid gap-6 py-4">
+            <Textarea
+              placeholder="What's on your mind?"
+              value={content}
+              onChange={handleContentChange}
+              className="min-h-[180px] text-lg"
             />
-            {image && (
-              <span className="text-sm text-gray-500">{image.name}</span>
+            {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+            <p className="text-sm text-gray-500">
+              Character count: {content.length}/{maxChars}
+            </p>
+
+            {/* Image Upload */}
+            <div className="flex items-center gap-4">
+              <Label
+                htmlFor="image-upload"
+                className="cursor-pointer flex items-center gap-2 text-[#6C5CE7] hover:text-[#6C5CE7]/80"
+              >
+                <Image className="h-6 w-6" />
+                <span className="text-base font-medium">
+                  {image ? "Change Image" : "Add Image"}
+                </span>
+              </Label>
+              <Input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+              {image && (
+                <span className="text-sm text-gray-500">{image.name}</span>
+              )}
+            </div>
+
+            {/* Privacy Selection */}
+            <Select value={privacy} onValueChange={setPrivacy}>
+              <SelectTrigger className="w-full text-base">
+                <SelectValue placeholder="Select privacy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="public">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-5 w-5" />
+                    <span>Public</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="almost-private">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    <span>Almost Private</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="private">
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-5 w-5" />
+                    <span>Private</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Private user selection using real followers */}
+            {privacy === "private" && (
+              <div>
+                <Label className="mb-2 block font-medium">
+                  Select users who can see this post:
+                </Label>
+                {followersLoading ? (
+                  <p>Loading followers...</p>
+                ) : (
+                  <div className="max-h-60 overflow-y-auto border p-2 rounded space-y-2">
+                    {followers && followers.length > 0 ? (
+                      followers.map((follower: Follower) => (
+                        <div key={follower.id} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`follower-${follower.id}`}
+                            className="mr-2"
+                            checked={selectedUsers.includes(follower.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedUsers((prev) => [
+                                  ...prev,
+                                  follower.id,
+                                ]);
+                              } else {
+                                setSelectedUsers((prev) =>
+                                  prev.filter((id) => id !== follower.id)
+                                );
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`follower-${follower.id}`}
+                            className="flex items-center gap-2"
+                          >
+                            <User className="h-5 w-5" />
+                            <span>{follower.nickname}</span>
+                          </label>
+                        </div>
+                      ))
+                    ) : (
+                      <p>No followers available</p>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
-          {/* Privacy Selection */}
-          <Select value={privacy} onValueChange={setPrivacy}>
-            <SelectTrigger className="w-full text-base">
-              <SelectValue placeholder="Select privacy" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="public">
-                <div className="flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
-                  <span>Public</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="almost-private">
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  <span>Almost Private</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="private">
-                <div className="flex items-center gap-2">
-                  <Lock className="h-5 w-5" />
-                  <span>Private</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Private user selection using real followers */}
-          {privacy === "private" && (
-            <div>
-              <Label className="mb-2 block font-medium">
-                Select users who can see this post:
-              </Label>
-              {followersLoading ? (
-                <p>Loading followers...</p>
-              ) : (
-                <div className="max-h-60 overflow-y-auto border p-2 rounded space-y-2">
-                  {followers && followers.length > 0 ? (
-                    followers.map((follower: Follower) => (
-                      <div key={follower.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`follower-${follower.id}`}
-                          className="mr-2"
-                          checked={selectedUsers.includes(follower.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedUsers((prev) => [
-                                ...prev,
-                                follower.id,
-                              ]);
-                            } else {
-                              setSelectedUsers((prev) =>
-                                prev.filter((id) => id !== follower.id)
-                              );
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor={`follower-${follower.id}`}
-                          className="flex items-center gap-2"
-                        >
-                          <User className="h-5 w-5" />
-                          <span>{follower.nickname}</span>
-                        </label>
-                      </div>
-                    ))
-                  ) : (
-                    <p>No followers available</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button
-            onClick={handleSubmit}
-            className="w-full bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white py-6 text-lg font-semibold"
-          >
-            Post
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-   </>
+          <DialogFooter>
+            <Button
+              onClick={handleSubmit}
+              className="w-full bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white py-6 text-lg font-semibold"
+            >
+              Post
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

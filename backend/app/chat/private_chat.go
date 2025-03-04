@@ -116,11 +116,9 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
         // Upgrade connection
         conn, err := upgrader.Upgrade(w, r, nil)
         if err != nil {
-            log.Printf("[PrivateChat] Upgrade error: %v", err)
             return
         }
         defer func() {
-            log.Printf("[PrivateChat] Closing connection")
             conn.Close()
         }()
 
@@ -128,27 +126,21 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
        	userID, err := sessions.GetUserIDFromSession(r)
 
         if err != nil {
-            log.Printf("[PrivateChat] Session error: %v", err,userID)
             conn.WriteMessage(websocket.TextMessage, []byte("Unauthorized"))
             return
         }
-        log.Printf("[PrivateChat] User %s connected", userID)
         AddChatClient(userID, conn, db)
         if err := MarkUserOnline(db, userID); err != nil {
-            log.Printf("[PrivateChat] MarkUserOnline error for user %s: %v", userID, err)
         }
         defer func() {
             RemoveChatClient(userID, db)
             if err := MarkUserOffline(db, userID); err != nil {
-                log.Printf("[PrivateChat] MarkUserOffline error for user %s: %v", userID, err)
             }
-            log.Printf("[PrivateChat] User %s disconnected", userID)
         }()
 
         // Set read deadline and pong handler
         conn.SetReadDeadline(time.Now().Add(pongWait))
         conn.SetPongHandler(func(appData string) error {
-            log.Printf("[PrivateChat] Received pong from user %s: %s", userID, appData)
             conn.SetReadDeadline(time.Now().Add(pongWait))
             return nil
         })
@@ -157,10 +149,8 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
         ticker := time.NewTicker(pingPeriod)
         defer ticker.Stop()
         go func() {
-            for t := range ticker.C {
-                log.Printf("[PrivateChat] Sending ping to user %s at %s", userID, t.Format(time.RFC3339))
+            for range ticker.C {
                 if err := conn.WriteMessage(websocket.PingMessage, []byte("ping")); err != nil {
-                    log.Printf("[PrivateChat] Ping error for user %s: %v", userID, err)
                     return
                 }
             }
@@ -170,18 +160,14 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
         for {
             msgType, msgBytes, err := conn.ReadMessage()
             if err != nil {
-                log.Printf("[PrivateChat] Read error for user %s: %v", userID, err)
                 break
             }
-            log.Printf("[PrivateChat] Received message from user %s: type=%d, payload=%s", userID, msgType, string(msgBytes))
             if msgType != websocket.TextMessage {
-                log.Printf("[PrivateChat] Ignoring non-text message from user %s", userID)
                 continue
             }
 
             var msg ChatMessage
             if err := json.Unmarshal(msgBytes, &msg); err != nil {
-                log.Printf("[PrivateChat] JSON unmarshal error for user %s: %v", userID, err)
                 continue
             }
             // Override sender fields
@@ -201,10 +187,8 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
                         "sender_id": userID,
                     }
                     notifBytes, _ := json.Marshal(typingNotification)
-                    log.Printf("[PrivateChat] Sending typing notification from %s to %s", userID, msg.ReceiverID)
                     client.Conn.WriteMessage(websocket.TextMessage, notifBytes)
                 } else {
-                    log.Printf("[PrivateChat] No active client for receiver %s", msg.ReceiverID)
                 }
                 continue
             }
@@ -214,7 +198,6 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
             if len(words) > 200 {
                 errorMsg := map[string]string{"error": "Message cannot exceed 200 words"}
                 errorBytes, _ := json.Marshal(errorMsg)
-                log.Printf("[PrivateChat] Message from user %s exceeds word limit", userID)
                 conn.WriteMessage(websocket.TextMessage, errorBytes)
                 continue
             }
@@ -231,7 +214,6 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
             if err := db.QueryRow(checkQuery, userID, msg.ReceiverID, msg.ReceiverID, userID).Scan(&allowed); err != nil || !allowed {
                 errorMsg := map[string]string{"error": "Chat not permitted: you must follow each other to chat."}
                 errorBytes, _ := json.Marshal(errorMsg)
-                log.Printf("[PrivateChat] Chat not permitted: user %s -> %s", userID, msg.ReceiverID)
                 conn.WriteMessage(websocket.TextMessage, errorBytes)
                 continue
             }
@@ -242,16 +224,13 @@ func PrivateChatHandler(db *sql.DB) http.HandlerFunc {
                 VALUES (?, ?, ?, ?, ?)
             `, msg.ID, userID, msg.ReceiverID, msg.Message, msg.CreatedAt)
             if err != nil {
-                log.Printf("[PrivateChat] DB insert error for user %s: %v", userID, err)
             }
 
             // Forward message to recipient if connected
             if client, ok := GetChatClient(msg.ReceiverID); ok {
                 sendBytes, _ := json.Marshal(msg)
-                log.Printf("[PrivateChat] Forwarding message from %s to %s", userID, msg.ReceiverID)
                 client.Conn.WriteMessage(websocket.TextMessage, sendBytes)
             } else {
-                log.Printf("[PrivateChat] Receiver %s not connected", msg.ReceiverID)
             }
         }
     }

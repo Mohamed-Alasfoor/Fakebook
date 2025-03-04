@@ -53,14 +53,14 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
         credentials: "include",
       });
       if (!res.ok) {
-        console.error("Failed to fetch notifications, status:", res.status);
+       console.log("Failed to fetch notifications, status:", res.status);
         setNotifications([]);
         return;
       }
       const data = await res.json();
       setNotifications(data ?? []);
     } catch (error) {
-      console.error("Error fetching notifications", error);
+     console.log("Error fetching notifications", error);
       setNotifications([]);
     } finally {
       setLoading(false);
@@ -88,7 +88,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
         );
       }
     } catch (error) {
-      console.error("Error marking notification as read", error);
+     console.log("Error marking notification as read", error);
     }
   };
 
@@ -115,10 +115,10 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           prev.filter((n) => n.id !== notification.id)
         );
       } else {
-        console.error("Failed to handle follow request, status:", res.status);
+       console.log("Failed to handle follow request, status:", res.status);
       }
     } catch (error) {
-      console.error("Error handling follow request", error);
+     console.log("Error handling follow request", error);
     }
   };
 
@@ -140,7 +140,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
       endpoint = "http://localhost:8080/groups/invite/respond";
       payload.group_id = notification.group_id;
     } else {
-      console.error(
+     console.log(
         "Unknown notification type for group action:",
         notification.type
       );
@@ -159,10 +159,10 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
           prev.filter((n) => n.id !== notification.id)
         );
       } else {
-        console.error("Failed to handle group request, status:", res.status);
+       console.log("Failed to handle group request, status:", res.status);
       }
     } catch (error) {
-      console.error("Error handling group request", error);
+     console.log("Error handling group request", error);
     }
   };
 
@@ -177,7 +177,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
         setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       }
     } catch (error) {
-      console.error("Error marking all as read", error);
+     console.log("Error marking all as read", error);
     }
   };
 

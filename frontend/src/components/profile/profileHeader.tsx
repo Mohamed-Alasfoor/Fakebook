@@ -8,15 +8,18 @@ import { useState } from "react";
 import Link from "next/link";
 import { User } from "@/types/user";
 
-
-
 interface ProfileHeaderProps {
   user: User;
 }
 
-export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps) {
+export default function ProfileHeader({
+  user: initialUser,
+}: ProfileHeaderProps) {
   const [user, setUser] = useState<User>(initialUser);
-  const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+  const [alert, setAlert] = useState<{
+    type: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -29,12 +32,15 @@ export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps)
 
   const refreshProfile = async () => {
     try {
-      const response = await axios.get(`http://localhost:8080/users/profile?user_id=${user.id}`, {
-        withCredentials: true,
-      });
+      const response = await axios.get(
+        `http://localhost:8080/users/profile?user_id=${user.id}`,
+        {
+          withCredentials: true,
+        }
+      );
       setUser(response.data);
     } catch (error) {
-      console.error("Error fetching profile data", error);
+      console.log("Error fetching profile data", error);
     }
   };
 
@@ -43,7 +49,10 @@ export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps)
       await axios.post(
         "http://localhost:8080/follow",
         { followed_id: user.id },
-        { withCredentials: true, headers: { "Content-Type": "application/json" } }
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "application/json" },
+        }
       );
       setAlert({ type: "success", message: "User followed successfully!" });
       refreshProfile(); // Fetch updated user data
@@ -86,7 +95,11 @@ export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps)
           <div className="flex flex-col items-center md:flex-row md:items-start gap-6">
             <Avatar className="w-32 h-32">
               <AvatarImage
-                src={user.avatar ? `http://localhost:8080/avatars/${user.avatar}` : "/profile.png"}
+                src={
+                  user.avatar
+                    ? `http://localhost:8080/avatars/${user.avatar}`
+                    : "/profile.png"
+                }
                 alt={`${user.first_name} ${user.last_name}`}
               />
               <AvatarFallback>
@@ -98,7 +111,9 @@ export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps)
               <h1 className="text-3xl font-bold mb-2">
                 {user.first_name} {user.last_name}
               </h1>
-              <p className="text-xl text-muted-foreground mb-4">@{user.nickname}</p>
+              <p className="text-xl text-muted-foreground mb-4">
+                @{user.nickname}
+              </p>
               <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <CalendarIcon className="w-4 h-4" />
@@ -127,11 +142,17 @@ export default function ProfileHeader({ user: initialUser }: ProfileHeaderProps)
                 </Button>
               </Link>
             ) : !user.is_following ? (
-              <Button className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white" onClick={followUser}>
+              <Button
+                className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white"
+                onClick={followUser}
+              >
                 {user.private ? "Request to Follow" : "Follow"}
               </Button>
             ) : (
-              <Button className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white" onClick={unfollowUser}>
+              <Button
+                className="bg-[#6C5CE7] hover:bg-[#6C5CE7]/90 text-white"
+                onClick={unfollowUser}
+              >
                 Unfollow
               </Button>
             )}

@@ -13,7 +13,10 @@ interface DeleteGroupButtonProps {
 
 const MySwal = withReactContent(Swal);
 
-export function DeleteGroupButton({ groupId, onDelete }: DeleteGroupButtonProps) {
+export function DeleteGroupButton({
+  groupId,
+  onDelete,
+}: DeleteGroupButtonProps) {
   const handleDelete = async () => {
     const result = await MySwal.fire({
       title: "Delete Group?",
@@ -28,23 +31,26 @@ export function DeleteGroupButton({ groupId, onDelete }: DeleteGroupButtonProps)
 
     if (result.isConfirmed) {
       try {
-        const response = await axios.delete("http://localhost:8080/groups/delete", {
-          data: { group_id: groupId },
-          withCredentials: true,
-        });
+        const response = await axios.delete(
+          "http://localhost:8080/groups/delete",
+          {
+            data: { group_id: groupId },
+            withCredentials: true,
+          }
+        );
 
         // Show success alert
         await MySwal.fire({
           title: "Group Deleted",
-          text: response.data, 
+          text: response.data,
           icon: "success",
           confirmButtonColor: "#6C5CE7",
         });
 
         if (onDelete) onDelete();
       } catch (error: unknown) {
-        console.error("Error deleting group:", error);
-  
+        console.log("Error deleting group:", error);
+
         if (axios.isAxiosError(error)) {
           // If server says 403 => not the creator
           if (error.response?.status === 403) {
@@ -75,9 +81,5 @@ export function DeleteGroupButton({ groupId, onDelete }: DeleteGroupButtonProps)
     }
   };
 
-  return (
-    <Button  onClick={handleDelete}>
-      Delete Group
-    </Button>
-  );
+  return <Button onClick={handleDelete}>Delete Group</Button>;
 }

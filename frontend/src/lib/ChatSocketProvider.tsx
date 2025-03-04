@@ -2,7 +2,13 @@
 
 import NotificationPopup from "@/components/Notifications/notification-popup";
 import Cookies from "js-cookie";
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 export interface ChatMessage {
   id: string;
@@ -20,9 +26,13 @@ interface ChatSocketContextValue {
   messages: ChatMessage[];
 }
 
-const ChatSocketContext = createContext<ChatSocketContextValue | undefined>(undefined);
+const ChatSocketContext = createContext<ChatSocketContextValue | undefined>(
+  undefined
+);
 
-export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [latestMessage, setLatestMessage] = useState<ChatMessage | null>(null);
@@ -60,12 +70,12 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setMessages((prev) => [...prev, data]);
           setLatestMessage(data);
         } catch (e) {
-          console.error("Error parsing chat message", e);
+          console.log("Error parsing chat message", e);
         }
       };
 
       socket.onerror = (error) => {
-        console.error("❌ Chat WebSocket error:", error);
+        console.log("❌ Chat WebSocket error:", error);
         reconnectTimer = setTimeout(connect, 5000);
       };
 
@@ -95,7 +105,7 @@ export const ChatSocketProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ws.send(JSON.stringify(message));
       setMessages((prev) => [...prev, message]);
     } else {
-      console.error("WebSocket is not connected.");
+      console.log("WebSocket is not connected.");
     }
   };
 

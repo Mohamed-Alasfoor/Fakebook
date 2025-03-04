@@ -13,7 +13,6 @@ interface DeletePostButtonProps {
 
 const MySwal = withReactContent(Swal);
 
-
 export function DeletePostButton({ postId }: DeletePostButtonProps) {
   const handleDelete = async () => {
     const result = await MySwal.fire({
@@ -40,9 +39,8 @@ export function DeletePostButton({ postId }: DeletePostButtonProps) {
         });
 
         window.location.reload();
-
       } catch (err: unknown) {
-        console.error("Error deleting post:", err);
+        console.log("Error deleting post:", err);
         MySwal.fire("Error", "Could not delete post.", "error");
       }
     }

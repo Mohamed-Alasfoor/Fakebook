@@ -11,8 +11,9 @@ import axios from "axios";
 import { Group } from "@/types/groupTypes";
 
 export default function GroupsPage() {
-  const [searchQuery,] = useState("");
-  const { groups, joinedGroups, isLoading, searchGroups, refreshGroups } = useGroups();
+  const [searchQuery] = useState("");
+  const { groups, joinedGroups, isLoading, searchGroups, refreshGroups } =
+    useGroups();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   async function requestToJoin(groupId: string) {
@@ -24,7 +25,7 @@ export default function GroupsPage() {
       );
       refreshGroups();
     } catch (error) {
-      console.error("Error sending join request:", error);
+      console.log("Error sending join request:", error);
     }
   }
 

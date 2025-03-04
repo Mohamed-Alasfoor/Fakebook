@@ -39,7 +39,7 @@ export default function ChatPage() {
               id: user.id,
               name: user.nickname || "Unknown User",
               avatar: user.avatar
-                ? `http://localhost:8080/uploads/avatars/${user.avatar}`
+                ? `http://localhost:8080/avatars/${user.avatar}`
                 : "/default-avatar.png",
               online: user.online,
             }));
@@ -48,16 +48,12 @@ export default function ChatPage() {
             console.warn("Received non-JSON message:", event.data);
           }
         } catch (error) {
-          console.error(
-            "❌ Error parsing WebSocket message:",
-            error,
-            event.data
-          );
+          console.log("❌ Error parsing WebSocket message:", error, event.data);
         }
       };
 
       ws.onerror = (error) => {
-        console.error("❌ WebSocket error:", error);
+        console.log("❌ WebSocket error:", error);
         reconnectTimer = setTimeout(connectWebSocket, 5000);
       };
 

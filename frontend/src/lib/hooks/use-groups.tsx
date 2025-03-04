@@ -18,38 +18,49 @@ export function useGroups() {
 
   const fetchGroups = useCallback(async () => {
     try {
-      const response = await axios.get("http://localhost:8080/groups", { withCredentials: true });
+      const response = await axios.get("http://localhost:8080/groups", {
+        withCredentials: true,
+      });
       setGroups(response.data);
     } catch (error) {
-      console.error("Error fetching groups:", error);
+      console.log("Error fetching groups:", error);
     }
   }, []);
 
   const fetchJoinedGroups = useCallback(async () => {
     try {
-      const response = await axios.get("http://localhost:8080/groups/user", { withCredentials: true });
+      const response = await axios.get("http://localhost:8080/groups/user", {
+        withCredentials: true,
+      });
       setJoinedGroups(response.data);
     } catch (error) {
-      console.error("Error fetching joined groups:", error);
+      console.log("Error fetching joined groups:", error);
     }
   }, []);
 
   const searchGroups = useCallback(async (query: string) => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`http://localhost:8080/groups/search?query=${encodeURIComponent(query)}`, {
-        withCredentials: true,
-      });
+      const response = await axios.get(
+        `http://localhost:8080/groups/search?query=${encodeURIComponent(
+          query
+        )}`,
+        {
+          withCredentials: true,
+        }
+      );
       setGroups(response.data);
     } catch (error) {
-      console.error("Error searching groups:", error);
+      console.log("Error searching groups:", error);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    Promise.all([fetchGroups(), fetchJoinedGroups()]).finally(() => setIsLoading(false));
+    Promise.all([fetchGroups(), fetchJoinedGroups()]).finally(() =>
+      setIsLoading(false)
+    );
   }, [fetchGroups, fetchJoinedGroups]);
 
   return {

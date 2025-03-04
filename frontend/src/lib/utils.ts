@@ -16,7 +16,7 @@ export function formatPostDate(dateString?: string): string {
     }
     return format(date, "dd/MM/yyyy");
   } catch (error) {
-    console.error("Error parsing date:", dateString, error);
+    console.log("Error parsing date:", dateString, error);
     return "Invalid date";
   }
 }

@@ -5,10 +5,13 @@ import { Post } from "@/types/post";
 interface UseLikesReturn {
   likesState: { [key: string]: boolean };
   likesCount: { [key: string]: number };
-  handleLike: (postId: string) => Promise<void>; 
+  handleLike: (postId: string) => Promise<void>;
 }
 
-export function useLikes(initialPosts: Post[], refreshPosts?: () => void): UseLikesReturn {
+export function useLikes(
+  initialPosts: Post[],
+  refreshPosts?: () => void
+): UseLikesReturn {
   const [likesState, setLikesState] = useState<{ [key: string]: boolean }>({});
   const [likesCount, setLikesCount] = useState<{ [key: string]: number }>({});
 
@@ -19,7 +22,7 @@ export function useLikes(initialPosts: Post[], refreshPosts?: () => void): UseLi
         let hasChanged = false;
 
         initialPosts.forEach((post) => {
-          const postId = String(post.id); 
+          const postId = String(post.id);
           if (newState[postId] !== post.has_liked) {
             newState[postId] = post.has_liked;
             hasChanged = true;
@@ -47,7 +50,8 @@ export function useLikes(initialPosts: Post[], refreshPosts?: () => void): UseLi
   }, [initialPosts]);
 
   // Handle like/unlike requests
-  const handleLike = async (postId: string) => { // Ensure postId is a string
+  const handleLike = async (postId: string) => {
+    // Ensure postId is a string
     try {
       const isLiked = likesState[postId] ?? false;
 
@@ -75,7 +79,7 @@ export function useLikes(initialPosts: Post[], refreshPosts?: () => void): UseLi
       // Refresh posts only when needed
       if (refreshPosts) refreshPosts();
     } catch (error) {
-      console.error("Error toggling like:", error);
+      console.log("Error toggling like:", error);
 
       // Rollback state changes on failure
       setLikesState((prev) => ({ ...prev, [postId]: likesState[postId] }));

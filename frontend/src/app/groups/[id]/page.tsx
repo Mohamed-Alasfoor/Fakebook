@@ -111,7 +111,7 @@ export default function GroupView() {
         setMembers(membersResponse?.data || []);
         setEvents(eventsResponse?.data || []);
       } catch (error) {
-        console.error("Error fetching group data:", error);
+       console.log("Error fetching group data:", error);
         router.push("/groups");
       } finally {
         setIsLoading(false);
@@ -188,7 +188,7 @@ export default function GroupView() {
         );
         setRsvps(rsvpData);
       } catch (error) {
-        console.error("Error fetching RSVPs:", error);
+       console.log("Error fetching RSVPs:", error);
       }
     };
 
@@ -283,7 +283,7 @@ export default function GroupView() {
         );
         setMessages(response.data);
       } catch (error) {
-        console.error("Error fetching previous chat messages:", error);
+       console.log("Error fetching previous chat messages:", error);
       }
     };
     fetchMessages();
