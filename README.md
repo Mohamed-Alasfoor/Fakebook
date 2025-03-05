@@ -1,4 +1,4 @@
-# Social Network Project
+# Fakebook Project
 
 A Facebook-like social network built with Go (backend) and Next.js (frontend), featuring authentication, real-time communication, group management, notifications, and more.
 
@@ -85,7 +85,7 @@ A Facebook-like social network built with Go (backend) and Next.js (frontend), f
 
 ```
 social-network/
-├── client/                 # Frontend application (Next.js)
+├── frontend/                 # Frontend application (Next.js)
 │   ├── src/
 │   │   ├── app/           # App pages (chat, groups, login, notifications, profile, register, settings)
 │   │   ├── components/    # Reusable UI components
@@ -151,7 +151,7 @@ social-network/
 
 3. Start the frontend:
    ```bash
-   cd client
+   cd frontend
    npm install
    npm run dev
    ```
