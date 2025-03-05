@@ -109,7 +109,7 @@ export default function PostsTab({
 
                   <div>
                     <p className="text-md font-semibold text-gray-800">
-                      {post.nickname || "Unknown User"}
+                      {post.nickname || "You"}
                     </p>
                     <p className="text-xs text-gray-500">
                       {new Date(post.created_at).toLocaleString()}

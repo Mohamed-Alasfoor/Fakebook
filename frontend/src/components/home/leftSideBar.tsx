@@ -118,7 +118,7 @@ export function LeftSidebar({ isOpen, onClose }: LeftSidebarProps) {
             </Avatar>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium truncate">
-                {user.nickname || "Unknown User"}
+                {user.nickname || "You"}
               </h3>
               <p className="text-xs text-white/70">View Profile</p>
             </div>

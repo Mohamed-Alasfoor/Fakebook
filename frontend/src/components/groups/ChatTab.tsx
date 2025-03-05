@@ -94,7 +94,7 @@ export default function ChatTab({
                 >
                   {!isCurrentUser && (
                     <p className="text-xs font-medium text-gray-600">
-                      {msg.nickname || "Unknown"}
+                      {msg.nickname || "You"}
                     </p>
                   )}
                   <p>{msg.message}</p>

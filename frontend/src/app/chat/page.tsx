@@ -37,7 +37,7 @@ export default function ChatPage() {
             const receivedUsers = JSON.parse(trimmedData);
             const formattedUsers: User[] = receivedUsers.map((user: User) => ({
               id: user.id,
-              name: user.nickname || "Unknown User",
+              name: user.nickname || "You",
               avatar: user.avatar
                 ? `http://localhost:8080/avatars/${user.avatar}`
                 : "/default-avatar.png",
