@@ -138,8 +138,8 @@ social-network/
 1. Clone the repository:
 
    ```bash
-   git clone https://learn.reboot01.com/git/malasfoor/social-network
-   cd social-network
+   git clone https://github.com/Mohamed-Alasfoor/Fakebook.git
+   cd Fakebook
    ```
 
 2. Start the backend:
